@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 收藏夹按 UP 主数量自动整理
 // @namespace    https://github.com/
-// @version      1.6.1
+// @version      1.6.2
 // @description  输入多个收藏夹名称，按 UP 主出现次数降序将视频移动到新建收藏夹
 // @author       codex
 // @match        https://space.bilibili.com/*/favlist*
@@ -141,16 +141,8 @@
     return { medias: all, expectedCount };
   }
 
-  async function createFolder(title, csrf) {
-    const body = new URLSearchParams({
-      title,
-      intro: '按UP主视频数量自动聚合',
-      privacy: '0',
-      cover: '',
-      csrf,
-      csrf_token: csrf,
-    });
-
+  async function postCreateFolder(payload) {
+    const body = new URLSearchParams(payload);
     const data = await requestJson('https://api.bilibili.com/x/v3/fav/folder/add', {
       method: 'POST',
       headers: {
@@ -165,6 +157,46 @@
     }
 
     return mediaId;
+  }
+
+  async function createFolder(title, csrf) {
+    const payloads = [
+      {
+        title,
+        privacy: '1',
+        csrf,
+      },
+      {
+        title,
+        privacy: '1',
+        csrf,
+        csrf_token: csrf,
+        platform: 'web',
+        jsonp: 'jsonp',
+      },
+      {
+        title,
+        intro: '',
+        privacy: '1',
+        cover: '',
+        csrf,
+      },
+    ];
+    let lastError;
+
+    for (const payload of payloads) {
+      try {
+        return await postCreateFolder(payload);
+      } catch (err) {
+        lastError = err;
+        log(`创建收藏夹「${title}」尝试失败：${err.message || err}`);
+        if (err?.code && ![-112, -400, -403].includes(err.code)) {
+          break;
+        }
+      }
+    }
+
+    throw lastError;
   }
 
   function findFolderByTitle(folders, title, excludedIds = new Set()) {
@@ -191,8 +223,9 @@
       }
 
       throw new Error(
-        `B站暂时拒绝自动新建收藏夹「${title}」（${err.apiMessage || '系统升级中'}）。` +
-        `请先在网页端手动创建同名收藏夹「${title}」，再重新执行脚本；脚本会自动复用该收藏夹。`,
+        `自动创建收藏夹「${title}」失败（${err.apiMessage || '系统升级中'}）。` +
+        `脚本已按当前 B 站 Web 收藏夹接口改用私密收藏夹与多组兼容参数重试，但仍未成功。` +
+        `请确认账号可在网页端手动新建收藏夹，或稍后再试。`,
       );
     }
   }
