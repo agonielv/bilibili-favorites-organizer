@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 收藏夹按 UP 主数量自动整理
 // @namespace    https://github.com/
-// @version      1.6.0
+// @version      1.6.1
 // @description  输入多个收藏夹名称，按 UP 主出现次数降序将视频移动到新建收藏夹
 // @author       codex
 // @match        https://space.bilibili.com/*/favlist*
@@ -71,7 +71,11 @@
       throw new Error(`接口返回异常（缺少 code）：${url}`);
     }
     if (data.code !== 0) {
-      throw new Error(`接口错误 code=${data.code}, message=${data.message || data.msg || '未知'}: ${url}`);
+      const error = new Error(`接口错误 code=${data.code}, message=${data.message || data.msg || '未知'}: ${url}`);
+      error.code = data.code;
+      error.apiMessage = data.message || data.msg || '未知';
+      error.url = url;
+      throw error;
     }
 
     return data;
@@ -144,6 +148,7 @@
       privacy: '0',
       cover: '',
       csrf,
+      csrf_token: csrf,
     });
 
     const data = await requestJson('https://api.bilibili.com/x/v3/fav/folder/add', {
@@ -160,6 +165,36 @@
     }
 
     return mediaId;
+  }
+
+  function findFolderByTitle(folders, title, excludedIds = new Set()) {
+    const normalize = (s) => String(s || '').trim().toLowerCase();
+    const wanted = normalize(title);
+    return folders.find((folder) => normalize(folder.title) === wanted && !excludedIds.has(String(folder.id))) || null;
+  }
+
+  async function createOrFindTargetFolder(title, csrf, mid, excludedIds = new Set()) {
+    try {
+      const mediaId = await createFolder(title, csrf);
+      return { id: mediaId, reused: false };
+    } catch (err) {
+      const isSystemUpgrade = err?.code === -112 || /系统升级中/.test(err?.apiMessage || err?.message || '');
+      if (!isSystemUpgrade) {
+        throw err;
+      }
+
+      const folders = await fetchCreatedFolders(mid);
+      const existingFolder = findFolderByTitle(folders, title, excludedIds);
+      if (existingFolder) {
+        log(`自动创建收藏夹「${title}」失败（${err.apiMessage || err.message}），已改用同名现有收藏夹 (${existingFolder.id})。`);
+        return { id: existingFolder.id, reused: true };
+      }
+
+      throw new Error(
+        `B站暂时拒绝自动新建收藏夹「${title}」（${err.apiMessage || '系统升级中'}）。` +
+        `请先在网页端手动创建同名收藏夹「${title}」，再重新执行脚本；脚本会自动复用该收藏夹。`,
+      );
+    }
   }
 
   async function moveResource(srcMediaId, dstMediaId, media, csrf) {
@@ -729,15 +764,33 @@
     const createdFolders = [];
     const totalToMove = items.length;
     let movedCount = 0;
+    const sourceFolderIds = new Set(selected.map((folder) => String(folder.id)));
+    const targetFolders = [];
+
+    onProgress({ phase: '准备目标收藏夹', processed: 0, total: chunks.length, detail: '正在创建或复用目标收藏夹...' });
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+      const chunk = chunks[chunkIndex];
+      const folderName = buildTargetFolderName(newFolderBaseName, chunkIndex, chunks.length);
+      const folderResult = await withRetry(
+        () => createOrFindTargetFolder(folderName, csrf, mid, sourceFolderIds),
+        `准备目标收藏夹 ${folderName}`,
+      );
+      targetFolders.push({ name: folderName, id: folderResult.id, reused: folderResult.reused, total: chunk.total });
+      createdFolders.push({ name: folderName, id: folderResult.id, reused: folderResult.reused, total: chunk.total });
+      log(`${folderResult.reused ? '复用' : '新建'}目标收藏夹：${folderName} (${folderResult.id})，计划 ${chunk.total} 个视频`);
+      onProgress({
+        phase: '准备目标收藏夹',
+        processed: chunkIndex + 1,
+        total: chunks.length,
+        detail: `${folderResult.reused ? '已复用' : '已创建'} ${folderName}`,
+      });
+    }
 
     onProgress({ phase: '移动视频', processed: 0, total: totalToMove, detail: '开始移动视频...' });
 
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
       const chunk = chunks[chunkIndex];
-      const folderName = buildTargetFolderName(newFolderBaseName, chunkIndex, chunks.length);
-      const dstMediaId = await withRetry(() => createFolder(folderName, csrf), `创建新收藏夹 ${folderName}`);
-      createdFolders.push({ name: folderName, id: dstMediaId, total: chunk.total });
-      log(`新收藏夹已创建：${folderName} (${dstMediaId})，计划 ${chunk.total} 个视频`);
+      const { name: folderName, id: dstMediaId } = targetFolders[chunkIndex];
 
       const displayOrderItems = chunk.groups.flatMap((group) => group.items);
       const moveOrderItems = [...displayOrderItems].reverse();
@@ -770,7 +823,7 @@
       }
     }
 
-    const folderText = createdFolders.map((f) => `${f.name}(id=${f.id}, ${f.total}条)`).join('；');
+    const folderText = createdFolders.map((f) => `${f.reused ? '复用' : '新建'}${f.name}(id=${f.id}, ${f.total}条)`).join('；');
     const report = `完成：成功 ${success}/${items.length}，失败 ${failed.length}。新收藏夹：${folderText}`;
     log(report, failed);
     onProgress({ phase: '执行完成', processed: totalToMove, total: totalToMove, detail: `失败 ${failed.length} 条` });
