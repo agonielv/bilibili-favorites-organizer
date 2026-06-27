@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 收藏夹按 UP 主数量自动整理
 // @namespace    https://github.com/
-// @version      1.6.2
+// @version      1.6.3
 // @description  输入多个收藏夹名称，按 UP 主出现次数降序将视频移动到新建收藏夹
 // @author       codex
 // @match        https://space.bilibili.com/*/favlist*
@@ -273,6 +273,27 @@
     return `${truncateName(base, maxBaseLength)}${suffix}`;
   }
 
+  function getMediaPublishTime(media) {
+    const candidates = [
+      media?.pubtime,
+      media?.pub_time,
+      media?.ctime,
+      media?.publish_time,
+      media?.publishTime,
+      media?.arc?.pubdate,
+      media?.archive?.pubdate,
+    ];
+
+    for (const value of candidates) {
+      const timestamp = Number(value);
+      if (Number.isFinite(timestamp) && timestamp > 0) {
+        return timestamp;
+      }
+    }
+
+    return 0;
+  }
+
   function buildUploaderGroups(items) {
     const groupMap = new Map();
 
@@ -291,7 +312,15 @@
     const groups = Array.from(groupMap.values());
 
     for (const group of groups) {
-      group.items.sort((a, b) => Number(b.media?.fav_time || 0) - Number(a.media?.fav_time || 0));
+      group.items.sort((a, b) => {
+        const publishDiff = getMediaPublishTime(b.media) - getMediaPublishTime(a.media);
+        if (publishDiff !== 0) return publishDiff;
+
+        const favTimeDiff = Number(b.media?.fav_time || 0) - Number(a.media?.fav_time || 0);
+        if (favTimeDiff !== 0) return favTimeDiff;
+
+        return String(a.media?.title || '').localeCompare(String(b.media?.title || ''), 'zh-Hans-CN');
+      });
       group.count = group.items.length;
     }
 
