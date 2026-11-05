@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 收藏夹按 UP 主数量自动整理
 // @namespace    https://github.com/
-// @version      1.6.3
+// @version      1.6.4
 // @description  输入多个收藏夹名称，按 UP 主出现次数降序将视频移动到新建收藏夹
 // @author       codex
 // @match        https://space.bilibili.com/*/favlist*
@@ -17,6 +17,8 @@
     maxFolderSize: 1000,
     maxFolderNameLength: 20,
     moveDelayMs: 350,
+    requestIntervalMs: 1200,
+    rateLimitCooldownMs: 60 * 1000,
     maxRetry: 3,
     defaultNewFolderNamePrefix: 'UP聚合',
     defaultTargetFolderSize: 1000,
@@ -52,7 +54,58 @@
     throw new Error('无法从当前页面识别 mid，请在“我的收藏夹”页面运行。');
   }
 
-  async function requestJson(url, init = {}) {
+  const COOLDOWN_KEY = 'fav-sort-cooldown-until';
+  let requestQueue = Promise.resolve();
+  let lastRequestAt = -Infinity;
+  let cooldownUntil = 0;
+
+  function getCooldownUntil() {
+    try {
+      const saved = Number(localStorage.getItem(COOLDOWN_KEY));
+      if (Number.isFinite(saved)) cooldownUntil = Math.max(cooldownUntil, saved);
+    } catch {
+      // 隐私模式或站点存储不可用时仍保留当前页面的冷却状态。
+    }
+    return cooldownUntil;
+  }
+
+  function cooldownError() {
+    const seconds = Math.max(1, Math.ceil((getCooldownUntil() - Date.now()) / 1000));
+    const error = new Error(`B 站接口触发限流或风控，已停止请求。脚本至少 ${seconds} 秒后才允许重试；这不代表 B 站届时一定恢复，请勿连续执行或刷新页面。`);
+    error.rateLimited = true;
+    error.retryable = false;
+    return error;
+  }
+
+  function startCooldown(retryAfter) {
+    const seconds = Number(retryAfter);
+    const retryAt = retryAfter
+      ? (Number.isFinite(seconds) ? Date.now() + seconds * 1000 : Date.parse(retryAfter))
+      : 0;
+    cooldownUntil = Math.max(getCooldownUntil(), Date.now() + CONFIG.rateLimitCooldownMs, Number.isFinite(retryAt) ? retryAt : 0);
+    try {
+      localStorage.setItem(COOLDOWN_KEY, String(cooldownUntil));
+    } catch {
+      // 不依赖站点存储也能停止当前任务。
+    }
+    return cooldownError();
+  }
+
+  function requestJson(url, init = {}) {
+    // 所有读写请求共用一个队列，避免分页或多个源收藏夹同时请求。
+    const pending = requestQueue.then(async () => {
+      if (getCooldownUntil() > Date.now()) throw cooldownError();
+      const delay = CONFIG.requestIntervalMs - (Date.now() - lastRequestAt);
+      if (delay > 0) await sleep(delay);
+      if (getCooldownUntil() > Date.now()) throw cooldownError();
+      lastRequestAt = Date.now();
+      return performRequest(url, init);
+    });
+    requestQueue = pending.catch(() => {});
+    return pending;
+  }
+
+  async function performRequest(url, init) {
     const response = await fetch(url, {
       credentials: 'include',
       ...init,
@@ -62,8 +115,15 @@
       },
     });
 
+    if ([412, 429].includes(response.status)) {
+      const error = startCooldown(response.headers.get('Retry-After'));
+      error.status = response.status;
+      throw error;
+    }
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status} ${response.statusText}: ${url}`);
+      const error = new Error(`HTTP ${response.status} ${response.statusText}: ${url}`);
+      error.retryable = response.status >= 500;
+      throw error;
     }
 
     const data = await response.json();
@@ -71,6 +131,11 @@
       throw new Error(`接口返回异常（缺少 code）：${url}`);
     }
     if (data.code !== 0) {
+      if ([-352, -412, -509, 429].includes(data.code) || /请求过于频繁|访问过于频繁|操作太频繁|风控/.test(data.message || data.msg || '')) {
+        const error = startCooldown(response.headers.get('Retry-After'));
+        error.code = data.code;
+        throw error;
+      }
       const error = new Error(`接口错误 code=${data.code}, message=${data.message || data.msg || '未知'}: ${url}`);
       error.code = data.code;
       error.apiMessage = data.message || data.msg || '未知';
@@ -106,7 +171,7 @@
       });
 
       const url = `https://api.bilibili.com/x/v3/fav/resource/list?${params.toString()}`;
-      const data = await requestJson(url);
+      const data = await withRetry(() => requestJson(url), `读取收藏夹 ${folderTitle || mediaId} 第 ${pn} 页`);
 
       const page = data.data || {};
       const medias = Array.isArray(page.medias) ? page.medias : [];
@@ -114,6 +179,7 @@
       const mediaCount = Number(info.media_count || 0);
       expectedCount = Number.isFinite(mediaCount) ? mediaCount : expectedCount;
 
+      const previousCount = all.length;
       for (const media of medias) {
         const resourceId = String(media?.id || '');
         if (!resourceId || seen.has(resourceId)) continue;
@@ -126,6 +192,9 @@
 
       if (!hasMoreByFlag && !hasMoreByCount) break;
       if (medias.length === 0) break;
+      if (all.length === previousCount) {
+        throw new Error(`收藏夹「${folderTitle || mediaId}」分页未返回新视频，已停止读取，请稍后重试。`);
+      }
 
       pn += 1;
     }
@@ -135,7 +204,7 @@
     }
 
     if (Number.isFinite(expectedCount) && expectedCount > all.length) {
-      log(`警告：收藏夹「${folderTitle || mediaId}」接口声明 ${expectedCount} 条，实际读取 ${all.length} 条。`);
+      throw new Error(`收藏夹「${folderTitle || mediaId}」读取不完整：接口声明 ${expectedCount} 条，实际读取 ${all.length} 条。已停止执行，请稍后重试。`);
     }
 
     return { medias: all, expectedCount };
@@ -188,6 +257,7 @@
       try {
         return await postCreateFolder(payload);
       } catch (err) {
+        if (err.retryable === false) throw err;
         lastError = err;
         log(`创建收藏夹「${title}」尝试失败：${err.message || err}`);
         if (err?.code && ![-112, -400, -403].includes(err.code)) {
@@ -364,9 +434,10 @@
       try {
         return await action();
       } catch (err) {
+        if (err.retryable === false) throw err;
         lastError = err;
         log(`${label} 失败，第 ${i}/${CONFIG.maxRetry} 次`, err.message || err);
-        await sleep(500 * i);
+        if (i < CONFIG.maxRetry) await sleep(1000 * (2 ** (i - 1)));
       }
     }
     throw new Error(`${label} 连续失败：${lastError?.message || lastError}`);
@@ -725,7 +796,7 @@
       statusNode.textContent = '准备中 0%（0/0）';
 
       try {
-        await onStart({
+        const result = await onStart({
           folderNames,
           newFolderBaseName: baseName,
           targetFolderSize: targetCap,
@@ -738,7 +809,9 @@
             statusNode.textContent = detail ? `${progressText} ${detail}` : progressText;
           },
         });
-        statusNode.textContent = '任务已完成，请查看上方完成提示。';
+        statusNode.textContent = result?.cancelled
+          ? '已取消：未创建收藏夹，也未移动视频。可以修改设置后重新开始。'
+          : '任务已完成，请查看上方完成提示。';
       } catch (err) {
         statusNode.textContent = `执行失败：${err.message || err}`;
       } finally {
@@ -770,11 +843,9 @@
     onProgress({ phase: '读取收藏夹', processed: 0, total: selected.length, detail: '开始读取源收藏夹内容...' });
 
     let readFolderCount = 0;
-    const collectTasks = selected.map(async (folder) => {
-      const { medias, expectedCount } = await withRetry(
-        () => fetchFolderResources(folder.id, folder.title),
-        `读取收藏夹 ${folder.title}`,
-      );
+    const items = [];
+    for (const folder of selected) {
+      const { medias, expectedCount } = await fetchFolderResources(folder.id, folder.title);
       log(`收藏夹「${folder.title}」读取完成：${medias.length}${Number.isFinite(expectedCount) ? `/${expectedCount}` : ''} 条`);
       readFolderCount += 1;
       onProgress({
@@ -783,15 +854,12 @@
         total: selected.length,
         detail: `已读取 ${folder.title}（${readFolderCount}/${selected.length}）`,
       });
-      return medias.map((media) => ({
+      for (const media of medias) items.push({
         srcMediaId: folder.id,
         srcFolderTitle: folder.title,
         media,
-      }));
-    });
-
-    const nestedItems = await Promise.all(collectTasks);
-    const items = nestedItems.flat();
+      });
+    }
 
     if (items.length === 0) {
       throw new Error('所选收藏夹没有可移动的视频。');
@@ -816,9 +884,7 @@
 
     if (!confirmed) {
       onProgress({ phase: '已取消', processed: 0, total: 0, detail: '任务已取消。' });
-      await showExecutionReport('已取消执行。为避免页面短时间展示异常，将自动刷新当前页面。');
-      location.reload();
-      return;
+      return { cancelled: true };
     }
 
     let success = 0;
@@ -869,6 +935,9 @@
           success += 1;
           log(`✔ ${summary}`);
         } catch (err) {
+          if (err.rateLimited) {
+            throw new Error(`${err.message} 本次已成功移动 ${success} 个视频；其余视频未继续处理，请核对收藏夹后再操作。`);
+          }
           failed.push({ media, reason: err.message || String(err), folderName });
           log(`✘ ${summary}`, err);
         }
