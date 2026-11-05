@@ -1,0 +1,62 @@
+{
+  "kind": "deterministic simulator; not live Bilibili; excludes initial source scan and network latency",
+  "intervalMs": 1200,
+  "results": [
+    {
+      "scenario": "连续来源",
+      "acceptedPageSize": 100,
+      "videos": 6000,
+      "baselineMoveRequests": 6000,
+      "moveRequests": 62,
+      "batchRequests": 62,
+      "baselineExecutionRequests": 6308,
+      "executionRequests": 192,
+      "requestReduction": "32.85x",
+      "pacingOnlyMinutes": "3.82",
+      "buffer": false,
+      "exactOrderVerified": true
+    },
+    {
+      "scenario": "六源交错",
+      "acceptedPageSize": 100,
+      "videos": 6000,
+      "baselineMoveRequests": 6000,
+      "moveRequests": 136,
+      "batchRequests": 136,
+      "baselineExecutionRequests": 6308,
+      "executionRequests": 413,
+      "requestReduction": "15.27x",
+      "pacingOnlyMinutes": "8.24",
+      "buffer": true,
+      "exactOrderVerified": true
+    },
+    {
+      "scenario": "连续来源",
+      "acceptedPageSize": 20,
+      "videos": 6000,
+      "baselineMoveRequests": 6000,
+      "moveRequests": 62,
+      "batchRequests": 62,
+      "baselineExecutionRequests": 6308,
+      "executionRequests": 432,
+      "requestReduction": "14.60x",
+      "pacingOnlyMinutes": "8.62",
+      "buffer": false,
+      "exactOrderVerified": true
+    },
+    {
+      "scenario": "六源交错",
+      "acceptedPageSize": 20,
+      "videos": 6000,
+      "baselineMoveRequests": 6000,
+      "moveRequests": 136,
+      "batchRequests": 136,
+      "baselineExecutionRequests": 6308,
+      "executionRequests": 893,
+      "requestReduction": "7.06x",
+      "pacingOnlyMinutes": "17.84",
+      "buffer": true,
+      "exactOrderVerified": true
+    }
+  ]
+}

@@ -1,0 +1,129 @@
+// Uses the shipped HTML/CSS/modules with a test-only chrome API shim.
+// Managed cloud Chromium blocks unpacked installs; this is NOT an install test.
+const { createRequire } = require('node:module');
+const path = require('node:path');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const os = require('node:os');
+const vm = require('node:vm');
+const requireBrowser = process.env.BROWSER_TOOLS_DIR ? createRequire(path.join(path.resolve(process.env.BROWSER_TOOLS_DIR), 'package.json')) : require;
+const { chromium } = requireBrowser('playwright');
+const root = path.resolve(__dirname, '..', 'extension');
+const origin = 'https://bfo.test';
+const shared = new Map();
+let session = { uid: '123', csrf: 'mock-only' }, openRequests = 0;
+let backendDisplayOrder = false;
+let rateLimit = false, requests = [], writes = [], nextId = 20;
+const initial = [
+  { id: 101, title: '<img src=x onerror=alert(1)>', pubtime: 100, upper: { mid: 7, name: 'Alpha' } },
+  { id: 102, title: 'Alpha 新', pubtime: 300, upper: { mid: 7, name: 'Alpha' } },
+  { id: 103, title: 'Beta 中', pubtime: 200, upper: { mid: 8, name: 'Beta' } },
+  { id: 104, title: 'Alpha 中', pubtime: 200, upper: { mid: 7, name: 'Alpha' } },
+  { id: 105, title: 'Beta 新', pubtime: 400, upper: { mid: 8, name: 'Beta' } },
+  { id: 106, title: 'Beta 旧', pubtime: 100, upper: { mid: 8, name: 'Beta' } },
+];
+let folders = new Map();
+function resetData() { folders = new Map([['10',{id:10,title:'源 A',medias:[initial[0],initial[1],initial[3]]}],['11',{id:11,title:'源 B',medias:[initial[2],initial[4],initial[5]]}]]); nextId = 20; }
+resetData();
+async function checkBackground() {
+  let listener, onClick, created = 0, updated = 0, rules;
+  const url = 'chrome-extension://testid/manager.html';
+  const chrome = { runtime: { id:'testid',getURL:()=>url,getContexts:async()=>created?[{tabId:1,windowId:2}]:[],onMessage:{addListener:fn=>{listener=fn}} },
+    tabs:{create:async()=>{created++},update:async()=>{updated++}},windows:{update:async()=>{}},action:{onClicked:{addListener:fn=>{onClick=fn}}},
+    declarativeNetRequest:{updateSessionRules:async value=>{rules=value}} };
+  vm.runInNewContext(fs.readFileSync(path.join(root,'background.js'),'utf8'), {chrome,URL,console});
+  const message=(value,sender)=>new Promise(resolve=>{const held=listener(value,sender,resolve);if(!held)resolve(null)});
+  assert.equal(await message({type:'OPEN_MANAGER'},{id:'foreign',url}),null);
+  await message({type:'OPEN_MANAGER'},{id:'testid',url});
+  await message({type:'OPEN_MANAGER'},{id:'testid',url:'https://space.bilibili.com/123/favlist'});
+  assert.equal(created,1);assert.equal(updated,1);
+  assert.equal((await message({type:'PREPARE_TRANSPORT'},{id:'testid',url})).ok,true);
+  assert.equal(rules.addRules[0].condition.initiatorDomains[0],'testid');
+  assert.equal(await message({type:'OPEN_MANAGER'},{id:'testid',url:'https://space.bilibili.com/123/video'}),null);
+  assert.equal(typeof onClick,'function');
+}
+(async()=>{
+await checkBackground();
+const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+try {
+ const context=await browser.newContext({viewport:{width:1440,height:1050},timezoneId:'Asia/Shanghai'});
+ await context.exposeBinding('testExtension', async (_source, action, value) => {
+  if(action==='getStorage')return value===null?Object.fromEntries(shared):Object.fromEntries((typeof value==='string'?[value]:value).filter(k=>shared.has(k)).map(k=>[k,shared.get(k)]));
+  if(action==='setStorage'){for(const [k,v]of Object.entries(value))shared.set(k,v);return;}
+  if(action==='removeStorage'){for(const k of typeof value==='string'?[value]:value)shared.delete(k);return;}
+  if(action==='cookie')return session?{name:value.name,value:value.name==='DedeUserID'?session.uid:session.csrf}:null;
+  if(action==='message'){if(value.type==='OPEN_MANAGER')openRequests++;return {ok:true};}
+  if(action==='tab')return {id:1};
+ });
+ await context.addInitScript(()=>{
+  window.chrome={storage:{local:{get:key=>window.testExtension('getStorage',key),set:value=>window.testExtension('setStorage',value),remove:key=>window.testExtension('removeStorage',key)}},
+   cookies:{get:value=>window.testExtension('cookie',value),onChanged:{addListener:fn=>{window.testCookieChanged=fn}}},
+   runtime:{sendMessage:value=>window.testExtension('message',value)},tabs:{create:value=>window.testExtension('tab',value)}};
+ });
+ await context.route('**/*',async route=>{
+  const req=route.request(),url=new URL(req.url());
+  if(url.origin===origin){
+   const file=path.join(root,url.pathname.slice(1)||'manager.html');
+   if(!file.startsWith(root+path.sep)||!fs.existsSync(file))return route.fulfill({status:404,body:'not found'});
+   const type=file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html';
+   return route.fulfill({contentType:type,headers:{'Content-Security-Policy':"script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"},body:fs.readFileSync(file)});
+  }
+  if(url.origin==='https://space.bilibili.com')return route.fulfill({contentType:'text/html',body:'<!doctype html><html><head></head><body><h1>模拟空间页</h1></body></html>'});
+  if(url.origin!=='https://api.bilibili.com')return route.abort();
+  requests.push({url:req.url(),at:Date.now(),method:req.method()});
+  if(rateLimit&&url.pathname.endsWith('resource/list'))return route.fulfill({status:429,headers:{'Retry-After':'60'},body:'limited'});
+  let data;
+  if(url.pathname.endsWith('list-all'))data={list:[...folders.values()].map(f=>({id:f.id,title:f.title,media_count:f.medias.length}))};
+  else if(url.pathname.endsWith('resource/list')){const f=folders.get(url.searchParams.get('media_id'));assert(f);const page=Number(url.searchParams.get('pn'));data={info:{media_count:f.medias.length},has_more:page*20<f.medias.length,medias:f.medias.slice((page-1)*20,page*20)};}
+  else if(url.pathname.endsWith('folder/add')){const form=new URLSearchParams(req.postData());assert.equal(form.get('csrf'),'mock-only');const id=nextId++;folders.set(String(id),{id,title:form.get('title'),privacy:form.get('privacy'),medias:[]});data={id};writes.push({type:'create',privacy:form.get('privacy')});}
+  else if(url.pathname.endsWith('resource/move')){const form=new URLSearchParams(req.postData());const source=folders.get(form.get('src_media_id')),target=folders.get(form.get('tar_media_id'));assert(source&&target);const ids=form.get('resources').split(',').map(s=>Number(s.split(':')[0]));const incoming=[];for(const id of ids){const index=source.medias.findIndex(m=>m.id===id);assert(index>=0);incoming.push(source.medias.splice(index,1)[0]);}if(backendDisplayOrder)target.medias.unshift(...incoming);else for(const media of incoming)target.medias.unshift(media);writes.push({type:'move',ids});data={};}
+  else throw new Error('Unexpected endpoint '+url.pathname);
+  return route.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':origin,'access-control-allow-credentials':'true'},body:JSON.stringify({code:0,data})});
+ });
+ const page=await context.newPage(), errors=[];page.on('pageerror',e=>errors.push(e.message));if(process.env.DEBUG_BROWSER){page.on('console',m=>{if(m.type()==='error')console.log('browser:',m.text())});page.on('requestfailed',r=>console.log('failed:',r.url(),r.failure()?.errorText));}
+ await page.goto(origin+'/manager.html');await page.waitForFunction(()=>document.querySelector('#account-label').textContent.includes('已登录'));
+ assert.equal(requests.length,0,'Opening must not scan');
+ await page.locator('#connect').click();await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('已读取 2') || document.querySelector('#error').textContent.length > 0);
+ assert.equal(await page.locator('#error').innerText(),'');await page.locator('#select-all').click();await page.locator('#generate').click();await page.locator('#preview').waitFor({state:'visible'});assert.equal(await page.locator('#video-total').innerText(),'6');
+ const reads=requests.length;
+ await page.locator('#review').click();await page.locator('#cancel').click();assert.equal(writes.length,0);assert.equal(await page.locator('#preview').isVisible(),true);
+ await page.locator('#back').click();await page.locator('[name=time-order][value=asc]').check();await page.locator('#generate').click();await page.locator('#preview').waitFor({state:'visible'});assert.equal(requests.length,reads,'Rule changes reuse snapshot');
+ const times=await page.locator('.plan-card').first().locator('.video-row').evaluateAll(es=>es.map(e=>Number(e.dataset.publishedAt)));assert.deepEqual(times,[100,200,300]);
+ assert.equal(await page.locator('.plan-list img').count(),0,'API titles must be rendered as text');
+ await page.locator('#review').click();await page.keyboard.press('Escape');assert.equal(writes.length,0);
+ // Public visibility is explicit in confirmation; reset to private for the run.
+ await page.locator('#back').click();await page.locator('#privacy').selectOption('public');await page.locator('#generate').click();await page.locator('#review').click();assert.match(await page.locator('#confirm-summary').innerText(),/公开/);await page.locator('#cancel').click();await page.locator('#back').click();await page.locator('#reset-rules').click();await page.locator('#generate').click();
+ await page.locator('#review').click();await page.locator('#execute').click();await page.waitForFunction(()=>document.querySelector('#execution-title').textContent==='整理完成',{},{timeout:30000});
+ assert.equal(writes.filter(w=>w.type==='move').length,3);assert(writes.some(w=>w.type==='move'&&w.ids.length>1));assert.equal(writes[0].privacy,'1');assert.deepEqual(folders.get('20').medias.map(m=>m.id),[102,104,101,105,103,106]);assert(await page.locator('#review').isDisabled());
+ assert(requests.every((r,i)=>!i||r.at-requests[i-1].at>=1100),'Production queue must actually pace requests');
+ const output=process.env.BROWSER_ARTIFACTS_DIR||path.join(os.tmpdir(),'bfo-browser-artifacts');fs.mkdirSync(output,{recursive:true});await page.screenshot({path:path.join(output,'extension-execution.png'),fullPage:true});
+ // Exercise staging + payload-direction calibration through the shipped page/modules.
+ const staged=Array.from({length:48},(_,i)=>({id:1001+i,title:'批量示例 '+i,pubtime:(i*7)%48+1,upper:{mid:7,name:'Stage UP'}}));
+ folders=new Map([['10',{id:10,title:'源 A',medias:staged.filter((_,i)=>i%2===0)}],['11',{id:11,title:'源 B',medias:staged.filter((_,i)=>i%2===1)}]]);nextId=20;backendDisplayOrder=true;
+ await page.locator('#connect').click();await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('已读取 2'));
+ await page.locator('#select-all').click();await page.locator('#privacy').selectOption('public');await page.locator('#generate').click();await page.locator('#preview').waitFor({state:'visible'});
+ await page.locator('#review').click();assert.match(await page.locator('#confirm').innerText(),/私密中转夹/);await page.locator('#execute').click();
+ await page.waitForFunction(()=>document.querySelector('#execution-title').textContent==='整理完成',{},{timeout:90000});
+ const buffers=[...folders.values()].filter(f=>f.title.startsWith('整理中转-'));assert.equal(buffers.length,1);assert.equal(buffers[0].privacy,'1');assert.equal(buffers[0].medias.length,0);
+ assert.equal(folders.get('20').privacy,'0');assert.deepEqual(folders.get('20').medias.map(m=>m.id),[...staged].sort((a,b)=>b.pubtime-a.pubtime).map(m=>m.id));
+ assert.match(await page.locator('#execution-message').innerText(),/移动请求/);assert.match(await page.locator('#execution-message').innerText(),/中转夹/);
+ backendDisplayOrder=false;
+ // Account switch invalidates cached state and never moves.
+ session={uid:'456',csrf:'different-test-only'};await page.evaluate(()=>window.testCookieChanged({cookie:{domain:'.bilibili.com',name:'DedeUserID'}}));assert(await page.locator('#review').isDisabled());assert.match(await page.locator('#account-label').innerText(),/变化/);
+ session={uid:'123',csrf:'mock-only'};resetData();await page.locator('#connect').click();await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('已读取 2') || document.querySelector('#error').textContent.length > 0);
+ await page.locator('#select-all').click();rateLimit=true;const before=requests.length;await page.locator('#generate').click();await page.waitForFunction(()=>document.querySelector('#error').textContent.includes('限流'));
+ assert.equal(requests.length,before+1);const limited=requests.length;await page.locator('#generate').click();await page.waitForTimeout(100);assert.equal(requests.length,limited,'Cooldown blocks subsequent requests');assert(shared.get('apiCooldownUntil')>Date.now());
+ // Native Web Locks in an ordinary secure page still exercise the production exclusive() path.
+ shared.delete('apiCooldownUntil');rateLimit=false;
+ await page.evaluate(()=>{window.held=new Promise(resolve=>window.releaseLock=resolve);navigator.locks.request('bfo-api-task',()=>window.held)});
+ const other=await context.newPage();await other.goto(origin+'/manager.html');await other.locator('#connect').click();await other.waitForFunction(()=>document.querySelector('#error').textContent.includes('另一个管理页'));await page.evaluate(()=>window.releaseLock());await other.close();
+ // Test the shipped content entry on an SPA transition, without actual Bilibili content/network.
+ const space=await context.newPage();await space.goto('https://space.bilibili.com/123');await space.addScriptTag({path:path.join(root,'content-entry.js')});assert.equal(await space.locator('#bfo-extension-entry').count(),0);await space.evaluate(()=>history.pushState({},'', '/123/favlist'));await space.locator('#bfo-extension-entry').waitFor();const box=await space.locator('#bfo-extension-entry').boundingBox();await space.mouse.click(box.x+box.width/2,box.y+box.height/2);await page.waitForTimeout(100);assert.equal(openRequests,1);await space.evaluate(()=>history.pushState({},'', '/123/video'));await space.locator('#bfo-extension-entry').waitFor({state:'detached'});
+ await page.setViewportSize({width:390,height:844});
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Management layout must fit a narrow screen');
+ await page.screenshot({path:path.join(output,'extension-mobile.png'),fullPage:true});
+ assert.deepEqual(errors,[]);assert.equal([...shared.values()].some(v=>JSON.stringify(v).includes('mock-only')),false,'Tokens must not be persisted');
+ console.log('PASS shipped-page integration: no auto-scan; login/list; cache and asc/desc; cancellation/Escape; public confirmation; private creation; ordered moves and verification; account invalidation; cooldown; native task lock; SPA entry; background sender validation/single manager; no stored credentials.');
+ console.log('LIMITATION: chrome API calls are shimmed; admin policy prevented unpacked installation. Real Chrome/Edge and live Bilibili are not validated.');
+} finally {await browser.close();}
+})().catch(error=>{console.error(error);process.exit(1)});

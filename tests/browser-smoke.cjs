@@ -1,0 +1,66 @@
+const { chromium } = require('playwright');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+(async () => {
+  const browser = await chromium.launch({executablePath:'/usr/bin/chromium', headless:true, args:['--no-sandbox']});
+  try {
+    const page = await browser.newPage();
+    let navigations = 0;
+    page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    const requests = [];
+    await page.route('https://space.bilibili.com/**', r => r.fulfill({contentType:'text/html',body:'<!doctype html><html><head></head><body></body></html>'}));
+    await page.route('https://api.bilibili.com/**', async r => {
+      const req = r.request();
+      requests.push({url:req.url(), method:req.method(), body:req.postData()});
+      let data;
+      if(req.url().includes('created/list-all')) data={list:[{id:10,title:'测试源'}]};
+      else if(req.url().includes('resource/list')) data={info:{media_count:2},has_more:false,medias:[{id:101,title:'较早',pubtime:100,upper:{mid:7,name:'测试UP'}},{id:102,title:'较新',pubtime:200,upper:{mid:7,name:'测试UP'}}]};
+      else if(req.url().includes('folder/add')) data={id:20};
+      else if(req.url().includes('resource/move')) data={};
+      else throw Error('Unexpected API '+req.url());
+      await r.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'https://space.bilibili.com','access-control-allow-credentials':'true'},body:JSON.stringify({code:0,data})});
+    });
+    await page.context().addCookies([{name:'bili_jct',value:'mock-only',domain:'space.bilibili.com',path:'/'}]);
+    await page.goto('https://space.bilibili.com/123/favlist');
+    await page.addScriptTag({path:process.env.FAV_SORT_SCRIPT || path.join(__dirname, '..', 'bilibili_fav_auto_sort.user.js')});
+    await page.locator('#fav-sort-launcher').click();
+    const panel=page.locator('#fav-sort-overlay');
+    await panel.locator('[data-action=start]').click();
+    await page.waitForFunction(()=>document.querySelector('[data-role=status]').textContent.includes('至少填写'));
+    assert.equal(requests.length,0);
+    await panel.locator('[name=folderNames]').fill('测试源');
+    await panel.locator('[data-action=start]').click();
+    const dialog=page.locator('#fav-sort-confirm-overlay');
+    await dialog.waitFor({state:'visible'});
+    assert.match(await dialog.innerText(),/2 个视频移动到 1 个新收藏夹/);
+    assert.equal(requests.filter(r=>r.method==='POST').length,0);
+    await dialog.locator('[data-action=ok]').click();
+    await page.waitForFunction(()=>document.querySelector('.fav-sort-confirm-body').textContent.includes('成功 2/2'));
+    const posts=requests.filter(r=>r.method==='POST');
+    assert.equal(posts.length,3);
+    assert(posts[0].url.includes('folder/add'));
+    assert.equal(new URLSearchParams(posts[0].body).get('privacy'),'1');
+    assert.deepEqual(posts.slice(1).map(r=>new URLSearchParams(r.body).get('resources')),['101:2','102:2']);
+    await dialog.locator('[data-action=ok]').click();
+    await page.waitForFunction(()=>!document.querySelector('[data-action=start]').disabled);
+    // Cancellation returns directly to an enabled panel without writes or a navigation.
+    requests.length=0;
+    await panel.locator('[data-action=start]').click();
+    await dialog.waitFor({state:'visible'});
+    await dialog.locator('[data-action=cancel]').click();
+    await page.waitForFunction(()=>document.querySelector('[data-role=status]').textContent.startsWith('已取消：'));
+    assert.equal(await panel.locator('[data-action=start]').isEnabled(), true);
+    assert.equal(await dialog.isVisible(), false);
+    assert.equal(navigations, 1);
+    await panel.locator('[data-action=start]').click();
+    await dialog.waitFor({state:'visible'});
+    await dialog.locator('[data-action=close]').click();
+    await page.waitForFunction(()=>document.querySelector('[data-role=status]').textContent.startsWith('已取消：'));
+    assert.equal(navigations, 1);
+    assert.equal(requests.filter(r=>r.method==='POST').length,0);
+    assert.deepEqual(errors,[]);
+    console.log('PASS: browser initialization, input validation, plan confirmation, private-folder creation, move ordering, completion, and cancellation without writes; all Bilibili requests mocked.');
+  } finally {await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1);});
