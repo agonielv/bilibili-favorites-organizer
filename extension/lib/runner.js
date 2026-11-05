@@ -37,7 +37,8 @@ export async function executePlan(client, plan, { onProgress = () => {}, assertF
     }
     state.phase = '完成';
     onProgress({ ...state, detail: `已移动并核对 ${state.verified} 条，移动请求 ${state.moveRequests} 次。${state.buffer ? `空私密中转夹“${state.buffer.title}”已保留，可自行删除。` : ''}` });
-    return state;
+    // The UI can update counts without issuing another list or video scan.
+    return { ...state, folders: after };
   } catch (cause) {
     const message = `${cause.message} 已提交 ${state.confirmed}/${state.total} 条、已核对 ${state.verified} 条。${state.pending ? `当前批次 ${state.pending} 条的实际状态需要核对。` : ''}本轮创建 ${state.created.length} 个目标。${state.buffer ? `请同时核对私密中转夹“${state.buffer.title}”（ID ${state.buffer.id}），不要删除其中尚有的视频。` : ''}已完成的移动不会自动撤销。`;
     throw new ExecutionError(message, { ...state, created: [...state.created] }, cause);

@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1340" viewBox="0 0 1600 1340" role="img" aria-labelledby="title desc">
+<title id="title">03 / 移动、核对与停止反馈</title><desc id="desc">静态布局草图 · 待确认 · 数据为示例 · 未修改应用代码。静态布局提案，待用户确认，不是已实现界面。</desc>
+<style>text{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC",sans-serif;font-variant-numeric:tabular-nums}*{box-sizing:border-box}</style>
+<rect x="0" y="0" width="1600" height="1340" rx="0" fill="#EDEEF2"/>
+<text x="40" y="56" font-size="28" fill="#1D1D1F" font-weight="650" text-anchor="start">03 / 移动、核对与停止反馈</text>
+<text x="40" y="88" font-size="14" fill="#62626A" font-weight="400" text-anchor="start">静态布局草图 · 待确认 · 数据为示例 · 未修改应用代码</text>
+<text x="1560" y="54" font-size="12" fill="#62626A" font-weight="600" text-anchor="end">UI UX PRO MAX / UX REVIEW</text>
+<rect x="40" y="128" width="1520" height="872" rx="16" fill="#F5F5F7" stroke="#D2D2D7"/>
+<rect x="41" y="129" width="1518" height="63" rx="15" fill="#FFFFFF"/>
+<path d="M40 192H1560" stroke="#D2D2D7"/>
+<rect x="64" y="144" width="36" height="36" rx="10" fill="#0066CC"/>
+<path d="M70 155v15h24V155H82l-3-4H70v4Zm0 3h24" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="round"/>
+<text x="112" y="160" font-size="17" fill="#1D1D1F" font-weight="650" text-anchor="start">收藏夹整理</text>
+<text x="112" y="179" font-size="11" fill="#62626A" font-weight="400" text-anchor="start">浏览器扩展 · 管理页方案</text>
+<text x="860" y="165" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">列表更新于 10:32</text>
+<rect x="1020" y="140" width="120" height="44" rx="10" fill="#E6E6EB"/>
+<text x="1080.0" y="167.0" font-size="14" fill="#62626A" font-weight="600" text-anchor="middle">刷新列表</text>
+<rect x="1154" y="145" width="172" height="30" rx="8" fill="#F5F5F7"/>
+<text x="1166" y="165" font-size="13" fill="#62626A" font-weight="500" text-anchor="start">已连接 · 示例账号</text>
+<rect x="1342" y="140" width="72" height="44" rx="10" fill="#FFFFFF" stroke="#D2D2D7"/>
+<text x="1378.0" y="167.0" font-size="14" fill="#1D1D1F" font-weight="600" text-anchor="middle">帮助</text>
+<rect x="1426" y="140" width="110" height="44" rx="10" fill="#FFFFFF" stroke="#D2D2D7"/>
+<text x="1481.0" y="167.0" font-size="14" fill="#1D1D1F" font-weight="600" text-anchor="middle">打开 B 站</text>
+<rect x="41" y="193" width="279" height="711" rx="0" fill="#FAFAFC"/>
+<path d="M320 192L320 904" stroke="#D2D2D7"/>
+<text x="64" y="230" font-size="17" fill="#1D1D1F" font-weight="650" text-anchor="start">收藏夹</text>
+<text x="296" y="230" font-size="13" fill="#62626A" font-weight="400" text-anchor="end">12</text>
+<rect x="60" y="248" width="240" height="44" rx="10" fill="#FFFFFF" stroke="#8C8C94"/>
+<circle cx="79" cy="268" r="6" fill="none" stroke="#62626A"/>
+<path d="M83 273L88 278" stroke="#62626A"/>
+<text x="99" y="276" font-size="14" fill="#1D1D1F" font-weight="400" text-anchor="start">技术</text>
+<text x="280" y="276" font-size="20" fill="#62626A" font-weight="400" text-anchor="start">×</text>
+<rect x="60" y="306" width="240" height="36" rx="9" fill="#EBEBF0"/>
+<rect x="63" y="309" width="75" height="30" rx="7" fill="#FFFFFF"/>
+<text x="100" y="329" font-size="12" fill="#1D1D1F" font-weight="600" text-anchor="middle">全部 12</text>
+<text x="180" y="329" font-size="12" fill="#62626A" font-weight="400" text-anchor="middle">已选 2</text>
+<text x="260" y="329" font-size="12" fill="#62626A" font-weight="400" text-anchor="middle">空夹 1</text>
+<text x="64" y="367" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">找到 2 / 12 个</text>
+<text x="64" y="398" font-size="13" fill="#62626A" font-weight="500" text-anchor="start">全选筛选结果（2）</text>
+<rect x="266" y="376" width="34" height="32" rx="8" fill="#FAFAFC" stroke="#D2D2D7"/>
+<text x="283" y="399" font-size="20" fill="#62626A" font-weight="600" text-anchor="middle">⋯</text>
+<text x="296" y="367" font-size="12" fill="#62626A" font-weight="400" text-anchor="end">范围已锁定</text>
+<rect x="56" y="416" width="248" height="64" rx="10" fill="#EAF2FF" stroke="#0066CC"/>
+<rect x="68" y="438" width="20" height="20" rx="5" fill="#6E8DB5"/>
+<path d="m73 448 4 4 7-8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+<path d="M100 440v15h24V440H112l-3-4H100v4Zm0 3h24" fill="none" stroke="#0066CC" stroke-width="1.6" stroke-linejoin="round"/>
+<text x="134" y="444" font-size="14" fill="#1D1D1F" font-weight="600" text-anchor="start">技术学习</text>
+<text x="134" y="465" font-size="12" fill="#0066CC" font-weight="400" text-anchor="start">当前查看</text>
+<text x="292" y="445" font-size="12" fill="#62626A" font-weight="400" text-anchor="end">2,400</text>
+<rect x="56" y="488" width="248" height="64" rx="10" fill="#FFFFFF" stroke="#E3E3E8"/>
+<rect x="68" y="510" width="20" height="20" rx="5" fill="#FFFFFF" stroke="#7C7C83"/>
+<path d="M100 512v15h24V512H112l-3-4H100v4Zm0 3h24" fill="none" stroke="#0066CC" stroke-width="1.6" stroke-linejoin="round"/>
+<text x="134" y="516" font-size="14" fill="#1D1D1F" font-weight="600" text-anchor="start">技术参考</text>
+<text x="134" y="537" font-size="12" fill="#62626A" font-weight="400" text-anchor="start">收藏夹</text>
+<text x="292" y="517" font-size="12" fill="#62626A" font-weight="400" text-anchor="end">600</text>
+<rect x="60" y="586" width="240" height="112" rx="10" fill="#FFFFFF" stroke="#D2D2D7"/>
+<text x="76" y="612" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">还有 1 个已选来源</text>
+<text x="76" y="635" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">不在当前筛选结果中。</text>
+<text x="76" y="674" font-size="13" fill="#0066CC" font-weight="600" text-anchor="start">查看全部已选（2） →</text>
+<text x="64" y="832" font-size="12" fill="#62626A" font-weight="400" text-anchor="start">点击名称查看，勾选加入整理。</text>
+<text x="64" y="855" font-size="12" fill="#62626A" font-weight="400" text-anchor="start">搜索与查看不会读取视频。</text>
+<rect x="1184" y="216" width="352" height="662" rx="14" fill="#FFFFFF" stroke="#E0E0E6"/>
+<text x="1208" y="249" font-size="18" fill="#1D1D1F" font-weight="650" text-anchor="start">任务设置</text>
+<rect x="1444" y="230" width="68" height="30" rx="8" fill="#F5F5F7"/>
+<text x="1456" y="250" font-size="13" fill="#62626A" font-weight="500" text-anchor="start">只读</text>
+<text x="1208" y="278" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">本次范围与规则已锁定</text>
+<text x="1208" y="320" font-size="12" fill="#62626A" font-weight="400" text-anchor="start">来源</text>
+<text x="1208" y="349" font-size="18" fill="#1D1D1F" font-weight="650" text-anchor="start">2 个收藏夹 · 6,000 条</text>
+<text x="1208" y="378" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">技术学习 / 工作参考</text>
+<path d="M1208 400H1512" stroke="#D2D2D7"/>
+<text x="1208" y="434" font-size="12" fill="#62626A" font-weight="400" text-anchor="start">目标</text>
+<text x="1208" y="463" font-size="18" fill="#1D1D1F" font-weight="650" text-anchor="start">6 个私密收藏夹</text>
+<text x="1208" y="492" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">UP聚合_01 … UP聚合_06</text>
+<path d="M1208 514H1512" stroke="#D2D2D7"/>
+<text x="1208" y="551" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">发布时间</text>
+<text x="1512" y="551" font-size="14" fill="#1D1D1F" font-weight="500" text-anchor="end">最新在前（降序）</text>
+<text x="1208" y="589" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">每夹容量</text>
+<text x="1512" y="589" font-size="14" fill="#1D1D1F" font-weight="500" text-anchor="end">1000 条</text>
+<text x="1208" y="627" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">UP 主聚合</text>
+<text x="1512" y="627" font-size="14" fill="#1D1D1F" font-weight="500" text-anchor="end">开启</text>
+<text x="1208" y="665" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">UP 主排列</text>
+<text x="1512" y="665" font-size="14" fill="#1D1D1F" font-weight="500" text-anchor="end">视频数量 · 多到少</text>
+<text x="1208" y="703" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">同 UP 不拆分</text>
+<text x="1512" y="703" font-size="14" fill="#1D1D1F" font-weight="500" text-anchor="end">开启</text>
+<rect x="1208" y="764" width="304" height="88" rx="10" fill="#F5F5F7"/>
+<text x="1222" y="790" font-size="12" fill="#62626A" font-weight="400" text-anchor="start">精确排序优先</text>
+<text x="1222" y="813" font-size="12" fill="#62626A" font-weight="400" text-anchor="start">搜索、已读内容与帮助仍可用。</text>
+<text x="1222" y="836" font-size="12" fill="#62626A" font-weight="400" text-anchor="start">任务结束后可生成新的整理预览。</text>
+<text x="344" y="244" font-size="24" fill="#1D1D1F" font-weight="650" text-anchor="start">正在整理</text>
+<text x="344" y="275" font-size="14" fill="#62626A" font-weight="400" text-anchor="start">本地查看与帮助仍可使用。请保持管理页打开。</text>
+<circle cx="358" cy="317" r="14" fill="#0066CC"/>
+<text x="358" y="322" font-size="12" fill="#FFFFFF" font-weight="600" text-anchor="middle">✓</text>
+<text x="381" y="322" font-size="13" fill="#1D1D1F" font-weight="600" text-anchor="start">准备</text>
+<path d="M472 317H546" stroke="#0066CC"/>
+<circle cx="569" cy="317" r="14" fill="#0066CC"/>
+<text x="569" y="322" font-size="12" fill="#FFFFFF" font-weight="600" text-anchor="middle">2</text>
+<text x="592" y="322" font-size="13" fill="#1D1D1F" font-weight="600" text-anchor="start">移动与核对</text>
+<path d="M683 317H757" stroke="#D2D2D7"/>
+<circle cx="780" cy="317" r="14" fill="#FFFFFF" stroke="#8C8C94"/>
+<text x="780" y="322" font-size="12" fill="#62626A" font-weight="600" text-anchor="middle">3</text>
+<text x="803" y="322" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">来源检查</text>
+<path d="M894 317H968" stroke="#D2D2D7"/>
+<circle cx="991" cy="317" r="14" fill="#FFFFFF" stroke="#8C8C94"/>
+<text x="991" y="322" font-size="12" fill="#62626A" font-weight="600" text-anchor="middle">4</text>
+<text x="1014" y="322" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">完成</text>
+<rect x="344" y="354" width="816" height="480" rx="14" fill="#FFFFFF" stroke="#E0E0E6"/>
+<text x="368" y="391" font-size="20" fill="#1D1D1F" font-weight="650" text-anchor="start">移动并核对目标</text>
+<rect x="1052" y="370" width="84" height="30" rx="8" fill="#EAF2FF"/>
+<text x="1064" y="390" font-size="13" fill="#0066CC" font-weight="500" text-anchor="start">进行中</text>
+<text x="368" y="422" font-size="14" fill="#62626A" font-weight="400" text-anchor="start">当前：UP聚合_05 · 第 5 / 6 个目标</text>
+<rect x="368" y="447" width="372" height="132" rx="12" fill="#F5F5F7"/>
+<text x="388" y="475" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">已提交到目标</text>
+<text x="388" y="514" font-size="26" fill="#1D1D1F" font-weight="650" text-anchor="start">4,800 / 6,000</text>
+<rect x="388" y="532" width="332" height="5" rx="2" fill="#E0E2E8"/>
+<rect x="388" y="532" width="265.6" height="5" rx="2" fill="#0066CC"/>
+<text x="388" y="561" font-size="12" fill="#62626A" font-weight="400" text-anchor="start">仍需完整核对，可能校正</text>
+<rect x="764" y="447" width="372" height="132" rx="12" fill="#F5F5F7"/>
+<text x="784" y="475" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">已完整核对</text>
+<text x="784" y="514" font-size="26" fill="#1D1D1F" font-weight="650" text-anchor="start">4,000 / 6,000</text>
+<rect x="784" y="532" width="332" height="5" rx="2" fill="#E0E2E8"/>
+<rect x="784" y="532" width="221.33333333333331" height="5" rx="2" fill="#1C6B3F"/>
+<text x="784" y="561" font-size="12" fill="#62626A" font-weight="400" text-anchor="start">按整夹核对完成后增加</text>
+<text x="368" y="610" font-size="14" fill="#62626A" font-weight="400" text-anchor="start">已提交不等于完成；系统仍需核对顺序与来源归属。</text>
+<path d="M368 632H1136" stroke="#D2D2D7"/>
+<rect x="368" y="652" width="768" height="106" rx="12" fill="#EAF2FF"/>
+<path d="M388 676v15h24V676H400l-3-4H388v4Zm0 3h24" fill="none" stroke="#0066CC" stroke-width="1.6" stroke-linejoin="round"/>
+<text x="428" y="692" font-size="15" fill="#1D1D1F" font-weight="600" text-anchor="start">本次私密中转夹</text>
+<text x="1116" y="692" font-size="13" fill="#0066CC" font-weight="600" text-anchor="end">查看位置 ↗</text>
+<text x="388" y="725" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">整理中转_示例 · 本任务视频可能暂存在此处，结束前请勿删除。</text>
+<text x="368" y="797" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">已用时 12:48 · 移动请求 87 次（示例）</text>
+<text x="1136" y="797" font-size="13" fill="#0066CC" font-weight="400" text-anchor="end">查看任务详情  ›</text>
+<rect x="41" y="904" width="1518" height="95" rx="0" fill="#FFFFFF"/>
+<path d="M40 904H1560" stroke="#D2D2D7"/>
+<text x="64" y="939" font-size="17" fill="#1D1D1F" font-weight="650" text-anchor="start">任务执行中 · 范围与规则已锁定</text>
+<text x="64" y="970" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">搜索、已读内容与帮助仍可使用。请保持管理页打开。</text>
+<rect x="1220" y="930" width="148" height="44" rx="10" fill="#FFFFFF" stroke="#D2D2D7"/>
+<text x="1294.0" y="957.0" font-size="14" fill="#1D1D1F" font-weight="600" text-anchor="middle">查看任务帮助</text>
+<rect x="1384" y="930" width="152" height="44" rx="10" fill="#E6E6EB"/>
+<text x="1460.0" y="957.0" font-size="14" fill="#62626A" font-weight="600" text-anchor="middle">新建整理任务</text>
+<text x="40" y="1041" font-size="15" fill="#1D1D1F" font-weight="600" text-anchor="start">同一任务卡的停止 / 完成状态示意，不另建结果页面：</text>
+<rect x="40" y="1062" width="744" height="208" rx="14" fill="#FFFFFF" stroke="#D2D2D7"/>
+<text x="64" y="1097" font-size="19" fill="#8C4B00" font-weight="650" text-anchor="start">请求已停止 · 至少 00:48 后可尝试</text>
+<text x="64" y="1128" font-size="14" fill="#1D1D1F" font-weight="400" text-anchor="start">已提交 4,800 · 已核对 4,000 · 当前批次 100 条待核对</text>
+<text x="64" y="1157" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">不会自动续跑；B 站服务端恢复可能更久。</text>
+<text x="64" y="1223" font-size="13" fill="#0066CC" font-weight="600" text-anchor="start">查看源 / 目标 / 中转位置 ↗</text>
+<rect x="580" y="1192" width="180" height="44" rx="10" fill="#E6E6EB"/>
+<text x="670.0" y="1219.0" font-size="14" fill="#62626A" font-weight="600" text-anchor="middle">冷却中 00:48</text>
+<rect x="808" y="1062" width="752" height="208" rx="14" fill="#FFFFFF" stroke="#D2D2D7"/>
+<text x="832" y="1097" font-size="19" fill="#1C6B3F" font-weight="650" text-anchor="start">整理完成 · 已移动并核对 6,000 条</text>
+<text x="832" y="1128" font-size="14" fill="#1D1D1F" font-weight="400" text-anchor="start">目标顺序与来源归属检查均通过，目录数量已更新。</text>
+<text x="832" y="1157" font-size="13" fill="#62626A" font-weight="400" text-anchor="start">空中转夹已保留，可前往 B 站自行删除。</text>
+<rect x="1148" y="1192" width="174" height="44" rx="10" fill="#FFFFFF" stroke="#D2D2D7"/>
+<text x="1235.0" y="1219.0" font-size="14" fill="#1D1D1F" font-weight="600" text-anchor="middle">查看收藏夹</text>
+<rect x="1338" y="1192" width="198" height="44" rx="10" fill="#0066CC"/>
+<text x="1437.0" y="1219.0" font-size="14" fill="#FFFFFF" font-weight="600" text-anchor="middle">开始下一次整理</text>
+<text x="40" y="1312" font-size="14" fill="#62626A" font-weight="400" text-anchor="start">计数只用真实引擎事件，不伪造 ETA；冷却倒计时仅更新本地显示，不轮询接口或自动重试。</text>
+</svg>

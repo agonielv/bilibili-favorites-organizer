@@ -1,0 +1,71 @@
+{
+  "method": "Local static HTML/CSS only; all requests intercepted; no extension or Bilibili APIs",
+  "checks": [
+    {
+      "name": "01-workspace",
+      "view": "workspace",
+      "documentWidth": 1600,
+      "viewportWidth": 1600,
+      "shellWidth": 1528,
+      "overflowText": [],
+      "glassFilter": "blur(24px) saturate(1.1)",
+      "visibleHeadings": [
+        "本次整理"
+      ]
+    },
+    {
+      "name": "02-confirmation",
+      "view": "confirmation",
+      "documentWidth": 1600,
+      "viewportWidth": 1600,
+      "shellWidth": 1528,
+      "overflowText": [],
+      "glassFilter": "blur(24px) saturate(1.1)",
+      "visibleHeadings": [
+        "整理计划"
+      ]
+    },
+    {
+      "name": "03-task-feedback",
+      "view": "task",
+      "documentWidth": 1600,
+      "viewportWidth": 1600,
+      "shellWidth": 1528,
+      "overflowText": [],
+      "glassFilter": "blur(24px) saturate(1.1)",
+      "visibleHeadings": [
+        "正在整理"
+      ]
+    },
+    {
+      "name": "04-compact",
+      "view": "workspace",
+      "documentWidth": 1200,
+      "viewportWidth": 1200,
+      "shellWidth": 1152,
+      "overflowText": [],
+      "glassFilter": "blur(24px) saturate(1.1)",
+      "visibleHeadings": [
+        "本次整理"
+      ]
+    },
+    {
+      "name": "05-cooldown",
+      "view": "cooldown",
+      "documentWidth": 1600,
+      "viewportWidth": 1600,
+      "shellWidth": 1528,
+      "overflowText": [],
+      "glassFilter": "blur(24px) saturate(1.1)",
+      "visibleHeadings": [
+        "任务已停止"
+      ]
+    },
+    {
+      "name": "390px reflow",
+      "width": 390,
+      "documentWidth": 390
+    }
+  ],
+  "errors": []
+}

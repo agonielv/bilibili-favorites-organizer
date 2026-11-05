@@ -1,0 +1,68 @@
+{
+  "method": "Actual v1.1.0 HTML/CSS/ES modules; mocked Chrome/Bilibili APIs; no real account requests",
+  "cases": {
+    "opening": {
+      "apiRequests": 0
+    },
+    "largeFolderList": {
+      "folderRows": 12,
+      "generateBelowFold": true,
+      "helperFont": "10px"
+    },
+    "keyboardAfterSelection": {
+      "activeTag": "BODY",
+      "activeId": "",
+      "selectedText": "已选 1 个"
+    },
+    "filteredSelectAll": {
+      "visible": 2,
+      "selected": "已选 12 个",
+      "selectedIds": 12
+    },
+    "emptyFilter": {
+      "message": "没有找到匹配的收藏夹。",
+      "clearSearchButton": 0,
+      "selected": "已选 12 个"
+    },
+    "readingLock": {
+      "searchDisabled": true,
+      "helpDisabled": true,
+      "viewDisabled": true
+    },
+    "confirmation": {
+      "summary": "6 条收藏记录 → 1 个私密收藏夹。最新发布在前。",
+      "containsSourceNames": false
+    },
+    "cancel": {
+      "writes": 0,
+      "previewVisible": true
+    },
+    "reselectSameScope": {
+      "additionalReads": 2
+    },
+    "verifying": {
+      "phase": "核对完整展示顺序",
+      "progress": "6 / 6 条",
+      "width": "100%",
+      "globalStatus": "只读预览已生成。尚未创建收藏夹或移动视频。",
+      "helpDisabled": true
+    },
+    "afterSuccess": {
+      "displayedSourceTotal": "6",
+      "actualRemaining": 0
+    },
+    "invalidCapacity": {
+      "message": "容量请填写 1–1000 的整数。",
+      "ariaInvalid": null,
+      "describedBy": null
+    },
+    "cooldown": {
+      "generateEnabled": true,
+      "message": "B 站接口触发限流或风控，已停止请求。至少 60 秒后才允许尝试；请勿连续执行或刷新。服务端实际恢复时间可能更长。"
+    },
+    "compactNavigation": {
+      "accessibleTree": "- navigation:\n  - button\n  - button\n  - button",
+      "namedOrganizeButton": 0
+    }
+  }
+}

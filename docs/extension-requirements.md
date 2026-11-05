@@ -1,6 +1,10 @@
-# Chrome / Edge 扩展需求 v2（已确认，进入开发）
+# Chrome / Edge 扩展需求与确认记录
 
-## 当前阶段与已确认约束
+## 1.2.0 追加确认
+
+用户已确认目录 / 范围 / 规则布局及交互，并确认前景毛玻璃视觉后授权开发和更新 GitHub。最新方案见 [UX 评估](ux-review/README.md) 和 [毛玻璃视觉](ux-review/glass/README.md)；当前实现与验证见 [1.2.0 验证记录](extension-validation.md)。以下第一版需求及原型保留为历史记录，其中原灰白 / 蓝色美术风格已由最新玻璃方案替换。
+
+## 第一版确认约束（历史）
 
 - 优先支持 Chrome 和 Microsoft Edge，无需 Tampermonkey，使用 Manifest V3。
 - 主界面为独立管理标签页；浏览器工具栏图标与 B 站收藏夹页面内控件均可打开它。已有管理页时切换过去，避免重复任务。
