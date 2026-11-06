@@ -115,7 +115,9 @@ test('creation compatibility only retries explicit rejections and honors public/
 test('runner prepares targets before moves and verifies default order', async () => {
   const items=[item(1),item(2),item(3),item(4)], client=new MemoryClient(items);
   const result=await executePlan(client,buildPlan(items,{capacity:2,keep:false}));
-  assert.equal(result.verified,4);assert.deepEqual(client.events.slice(0,2).map(e=>e.type),['create','create']);
+  assert.equal(result.verified,4);assert.equal(client.events[0].type,'read');
+  const firstMove=client.events.findIndex(e=>e.type==='move');
+  assert.deepEqual(client.events.slice(0,firstMove).filter(e=>e.type==='create').map(e=>e.type),['create','create']);
   assert(client.events.some(e=>e.type==='move'&&e.ids.length>1));
 });
 test('runner halts immediately on ambiguous writes and retains pending batch information', async () => {
@@ -135,6 +137,73 @@ test('session changes stop before creating destinations', async () => {
   const client=new MemoryClient([item(1)]);
   await assert.rejects(executePlan(client,buildPlan([item(1)],{}),{assertFresh:async()=>{throw Error('account changed')}}),/account changed/);
   assert.equal(client.events.length,0);
+});
+test('same-count source replacements or availability/sort changes stop before all writes', async () => {
+  for (const change of [
+    entry => { entry.id = '999'; },
+    entry => { entry.unavailable = true; },
+    entry => { entry.publishedAt = 999; },
+    entry => { entry.uploaderId = '999'; },
+  ]) {
+    const input = [item(1), item(2)], client = new MemoryClient(input);
+    change(client.data.get('10').items[0]);
+    await assert.rejects(executePlan(client,buildPlan(input,{})), /内容或视频状态已变化/);
+    assert(!client.events.some(event => event.type === 'create' || event.type === 'move'));
+  }
+});
+test('failure or risk in execution preflight never creates targets or writes', async () => {
+  const input = [item(1)], client = new MemoryClient(input);
+  client.resources = async () => { throw Object.assign(new Error('preflight rate limit'), { rateLimited: true }); };
+  await assert.rejects(executePlan(client, buildPlan(input, {})), error => error.cause.rateLimited && error.state.created.length === 0 && error.state.pending === 0);
+  assert.equal(client.moves, 0);
+});
+test('only explicit unavailable markers skip a video; missing metadata remains sortable', () => {
+  const folder = { id:'10',title:'源' };
+  for (const media of [{id:1,attr:1}, {id:2,attr:'9',upper:null}, {id:3,title:'已失效视频'}, {id:4,title:'视频已删除'}]) {
+    assert.equal(normalizeMedia(media,folder).unavailable,true);
+  }
+  for (const attr of [undefined,0,2,8]) {
+    const video = normalizeMedia({id:5,attr,upper:null},folder);
+    assert.equal(video.unavailable,false); assert.equal(buildPlan([video],{}).itemCount,1);
+  }
+  assert.throws(() => normalizeMedia({id:0,attr:9},folder), /无效的视频 ID/);
+});
+test('unavailable videos do not affect grouping, duplicate checks, capacity or source validation', async () => {
+  const valid = item(1), skipped = [
+    {...item(2),unavailable:true,uploaderId:'0'},
+    {...item(1,0,0,'11'),unavailable:true},
+    {...item(3,0,0,'11'),unavailable:true},
+  ];
+  const input = [valid,...skipped], plan = buildPlan(input,{capacity:1}), client = new MemoryClient(input);
+  assert.equal(plan.recordCount,4); assert.equal(plan.itemCount,1); assert.equal(plan.uploaderCount,1);
+  assert.equal(plan.skippedItems.length,3); assert.equal(plan.sources.length,2);
+  const result = await executePlan(client,plan);
+  assert.equal(result.verified,1); assert.equal(result.skipped,3);
+  assert.deepEqual(client.data.get('10').items.map(entry=>entry.id),['2']);
+  assert.deepEqual(client.data.get('11').items.map(entry=>entry.id),['1','3']);
+  assert(client.events.filter(event=>event.type==='move').every(event=>event.ids.length===1 && event.sourceId==='10' && event.ids[0]==='1'));
+});
+test('a page containing only unavailable videos has a read-only preview and cannot execute', async () => {
+  const input = [{...item(1),unavailable:true}], plan = buildPlan(input,{}), client = new MemoryClient(input);
+  assert.equal(plan.recordCount,1); assert.equal(plan.itemCount,0); assert.equal(plan.chunks.length,0);
+  assert.equal(plan.skippedItems.length,1);
+  await assert.rejects(executePlan(client,plan), /没有可移动的视频/);
+  assert.equal(client.requests,0);
+});
+test('a skipped video becoming available invalidates the plan before targets are created', async () => {
+  const input = [item(1),{...item(2),unavailable:true}], client = new MemoryClient(input);
+  client.data.get('10').items[1].unavailable = false;
+  await assert.rejects(executePlan(client,buildPlan(input,{})), /内容或视频状态已变化/);
+  assert(!client.events.some(event=>event.type==='create' || event.type==='move'));
+});
+test('an empty selected source is also revalidated before writes', async () => {
+  const input = [item(1)], client = new MemoryClient(input);
+  client.data.set('11',{id:'11',title:'空来源',items:[]});
+  const folders = await client.folders(), plan = buildPlan(input,{},folders);
+  assert.equal(plan.sources.length,2);
+  client.data.get('11').items.push(item(2,7,2,'11'));
+  await assert.rejects(executePlan(client,plan), /数量已变化/);
+  assert(!client.events.some(event=>event.type==='create' || event.type==='move'));
 });
 for (const cap of [20,100]) test(`page-size negotiation at server cap ${cap} never skips records`, async () => {
   const all=Array.from({length:241},(_,n)=>({id:n+1,upper:{mid:7}}));

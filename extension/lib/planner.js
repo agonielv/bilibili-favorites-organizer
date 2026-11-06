@@ -15,7 +15,10 @@ export function normalizeMedia(media, folder) {
   const type = Number(media.type ?? 2);
   if (type !== 2) throw new Error(`收藏夹“${folder.title}”含非视频收藏，本版仅处理视频，请单独选择视频收藏夹。`);
   const candidates = [media.pubtime, media.pub_time, media.ctime, media.publish_time, media.publishTime, media.arc?.pubdate, media.archive?.pubdate];
-  return { id, type, title: String(media.title || `视频 ${id}`), sourceId: String(folder.id), sourceTitle: String(folder.title),
+  // Favorites use the low attr bit for unavailable resources (including attr=9).
+  // Missing uploader/date metadata alone does not mean a video is unavailable.
+  const unavailable = (Number(media.attr) & 1) !== 0 || /^(已失效视频|视频已失效|已删除视频|视频已删除)$/.test(String(media.title || ''));
+  return { id, type, unavailable, title: String(media.title || `视频 ${id}`), sourceId: String(folder.id), sourceTitle: String(folder.title),
     uploaderId: String(media.upper?.mid || '0'), uploaderName: String(media.upper?.name || '未知 UP 主'),
     publishedAt: candidates.map(Number).find(n => Number.isFinite(n) && n > 0) || 0,
     favoredAt: Number(media.fav_time) || 0 };
@@ -29,9 +32,16 @@ export function compareVideos(time) {
       collator.compare(a.title, b.title) || collator.compare(a.id, b.id) || collator.compare(a.sourceId, b.sourceId);
   };
 }
-export function buildPlan(items, inputRules) {
+export function buildPlan(items, inputRules, sourceFolders = []) {
   const rules = validateRules(inputRules);
   if (!items.length) throw new Error('所选收藏夹没有可移动的视频。');
+  const sources = new Map(sourceFolders.map(folder => [String(folder.id), { id: String(folder.id), title: folder.title, items: [] }]));
+  for (const item of items) {
+    if (!sources.has(item.sourceId)) sources.set(item.sourceId, { id: item.sourceId, title: item.sourceTitle, items: [] });
+    sources.get(item.sourceId).items.push(item);
+  }
+  const skippedItems = items.filter(item => item.unavailable);
+  items = items.filter(item => !item.unavailable);
   const resources = new Set();
   const grouped = new Map();
   for (const item of items) {
@@ -63,7 +73,8 @@ export function buildPlan(items, inputRules) {
     }
   }
   if (current.length) chunks.push(current);
-  return { rules, itemCount: items.length, uploaderCount: grouped.size, missingDates: items.filter(i => !i.publishedAt).length,
+  return { rules, sources: [...sources.values()], skippedItems, recordCount: items.length + skippedItems.length,
+    itemCount: items.length, uploaderCount: grouped.size, missingDates: items.filter(i => !i.publishedAt).length,
     chunks: chunks.map((items, index) => ({ name: rules.base + (chunks.length > 1 ? `-${index + 1}` : ''), items })) };
 }
 // Never merge nonadjacent source segments just to obtain a larger batch.

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bilibili 收藏夹整理",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "在独立管理页选择收藏夹，按可配置规则预览和整理，保留限流保护。",
   "minimum_chrome_version": "116",
   "incognito": "not_allowed",

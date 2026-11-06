@@ -1,10 +1,10 @@
 {
   "name": "bilibili-favorites-organizer",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/extension.test.mjs && node tests/transfer.test.mjs && node tests/request-safety.test.cjs && node tests/source-cache.test.mjs",
+    "test": "node tests/extension.test.mjs && node tests/transfer.test.mjs && node tests/request-safety.test.cjs && node tests/source-cache.test.mjs && node tests/large-collection.test.mjs",
     "test:browser": "node tests/extension-browser.cjs",
     "benchmark": "node tests/transfer-benchmark.mjs",
     "pack": "python3 tools/package-extension.py"

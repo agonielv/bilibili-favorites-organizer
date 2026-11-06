@@ -13,6 +13,7 @@ const origin = 'https://bfo.test';
 const shared = new Map();
 let session = { uid: '123', csrf: 'mock-only' }, openRequests = 0;
 let backendDisplayOrder = false;
+let simulateLongScan = false;
 let holdReads=false, readGate, releaseRead, holdVerification=false, verificationGate, releaseVerification, targetFullReads=0;
 let rateLimit = false, requests = [], writes = [], nextId = 20;
 const initial = [
@@ -23,8 +24,9 @@ const initial = [
   { id: 105, title: 'Beta 新', pubtime: 400, upper: { mid: 8, name: 'Beta' } },
   { id: 106, title: 'Beta 旧', pubtime: 100, upper: { mid: 8, name: 'Beta' } },
 ];
+const unavailable = { id: 107, type: 2, attr: 9, title: '已失效视频', upper: null, pubtime: 0 };
 let folders = new Map();
-function resetData() { folders = new Map([['10',{id:10,title:'源 A',medias:[initial[0],initial[1],initial[3]]}],['11',{id:11,title:'源 B',medias:[initial[2],initial[4],initial[5]]}]]); nextId = 20; }
+function resetData() { folders = new Map([['10',{id:10,title:'源 A',medias:[initial[0],initial[1],initial[3],unavailable]}],['11',{id:11,title:'源 B',medias:[initial[2],initial[4],initial[5]]}]]); nextId = 20; }
 resetData();
 async function checkBackground() {
   let listener, onClick, created = 0, updated = 0, rules;
@@ -71,6 +73,7 @@ try {
   }
   if(url.origin==='https://space.bilibili.com')return route.fulfill({contentType:'text/html',body:'<!doctype html><html><head></head><body><h1>模拟空间页</h1></body></html>'});
   if(url.origin!=='https://api.bilibili.com')return route.abort();
+  if(simulateLongScan)await req.frame().evaluate(()=>window.advanceBfoTestClock(1200));
   requests.push({url:req.url(),at:Date.now(),method:req.method()});
   if(rateLimit&&url.pathname.endsWith('resource/list'))return route.fulfill({status:429,headers:{'Retry-After':'60'},body:'limited'});
   let data;
@@ -97,6 +100,9 @@ try {
  assert(await page.locator('#search').isEnabled());assert(await page.locator('#nav-help').isEnabled());assert(await firstCheck.isDisabled());
  await page.locator('#nav-help').click();await page.locator('#help-back').click();holdReads=false;releaseRead();
  await page.locator('#preview').waitFor({state:'visible'});assert.equal(await page.locator('#video-total').innerText(),'6');
+ assert.match(await page.locator('#unavailable-summary').innerText(),/共读取 7 条收藏.*6 条可移动.*1 条已失效/);
+ await page.locator('#unavailable-details summary').click();
+ assert.match(await page.locator('#unavailable-sources').innerText(),/源 A：1 条/);
  await page.screenshot({path:path.join(output,'extension-preview.png'),fullPage:true});
  const reads=requests.length;
  await page.locator('#review').click();assert.match(await page.locator('#confirm-sources').innerText(),/源 A/);assert.match(await page.locator('#confirm-sources').innerText(),/源 B/);await page.screenshot({path:path.join(output,'extension-confirmation.png'),fullPage:true});await page.locator('#cancel').click();assert.equal(writes.length,0);assert.equal(await page.locator('#preview').isVisible(),true);
@@ -116,7 +122,9 @@ try {
  holdVerification=false;releaseVerification();await page.waitForFunction(()=>document.querySelector('#execution-title').textContent==='整理完成',{},{timeout:30000});
  assert.equal(writes.filter(w=>w.type==='move').length,3);assert(writes.some(w=>w.type==='move'&&w.ids.length>1));assert.equal(writes[0].privacy,'1');assert.deepEqual(folders.get('20').medias.map(m=>m.id),[102,104,101,105,103,106]);assert(await page.locator('#review').isDisabled());
  assert(requests.every((r,i)=>!i||r.at-requests[i-1].at>=1100),'Production queue must actually pace requests');
- assert.equal(await page.locator('#selection-total').innerText(),'0','Successful execution must synchronize source counts');
+ assert.equal(await page.locator('#selection-total').innerText(),'1','Successful execution must synchronize counts including retained unavailable videos');
+ assert.deepEqual(folders.get('10').medias.map(media=>media.id),[107]);
+ assert.match(await page.locator('#execution-message').innerText(),/1 条失效收藏已保留在原夹/);
  await page.screenshot({path:path.join(output,'extension-execution.png'),fullPage:true});
  // Exercise staging + payload-direction calibration through the shipped page/modules.
  const staged=Array.from({length:48},(_,i)=>({id:1001+i,title:'批量示例 '+i,pubtime:(i*7)%48+1,upper:{mid:7,name:'Stage UP'}}));
@@ -147,7 +155,58 @@ try {
  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Management layout must fit a narrow screen');
  await page.screenshot({path:path.join(output,'extension-mobile.png'),fullPage:true});
  assert.deepEqual(errors,[]);assert.equal([...shared.values()].some(v=>JSON.stringify(v).includes('mock-only')),false,'Tokens must not be persisted');
+ // Reproduce the reported 13-folder/11606-record workload through the shipped UI.
+ // Advance only the browser's wall clock per simulated API response; request
+ // timers and the production queue implementation are unchanged. The real-time
+ // pacing assertion above still covers ordinary operation.
+ shared.delete('rules'); shared.delete('apiCooldownUntil');
+ folders=new Map(Array.from({length:13},(_,index)=>[String(index+10),{id:index+10,title:`大来源 ${index+1}`,medias:[]} ]));
+ for(let index=0;index<11606;index++) {
+   const lost=index%7===0;
+   folders.get(String(Math.floor(index*13/11606)+10)).medias.push({id:20000+index,type:2,attr:lost?9:0,title:lost?'已失效视频':`大视频 ${index}`,pubtime:lost?0:index+1,upper:lost?null:{mid:Math.floor(index/400)+1,name:`UP ${Math.floor(index/400)+1}`}});
+ }
+ await context.addInitScript(()=>{
+   const realNow=Date.now.bind(Date);let offset=0;
+   window.advanceBfoTestClock=ms=>{offset+=ms;};Date.now=()=>realNow()+offset;
+ });
+ simulateLongScan=true;
+ const large=await context.newPage();large.on('pageerror',error=>errors.push(error.message));
+ await large.goto(origin+'/manager.html');
+ await large.locator('#connect').click();await large.waitForFunction(()=>document.querySelector('#status').textContent.includes('已读取 13'));
+ await large.locator('#select-all').click();
+ const writesBeforeLarge=writes.length;
+ await large.locator('#generate').click();await large.locator('#preview').waitFor({state:'visible',timeout:60000});
+ assert.equal(await large.locator('#video-total').innerText(),'9,948');
+ assert.match(await large.locator('#unavailable-summary').innerText(),/11,606 条收藏.*1,658 条已失效/);
+ assert.equal(await large.locator('#unavailable-sources li').count(),13);
+ assert.equal(await large.locator('#error').innerText(),'');
+ const largeReads=requests.length;
+ await large.evaluate(()=>window.advanceBfoTestClock(24*60*60*1000));await large.waitForTimeout(1100);
+ assert(await large.locator('#review').isEnabled(),'Review remains available after a long scan and a day of waiting');
+ await large.locator('#back').click();await large.locator('[name=time-order][value=asc]').check();
+ await large.locator('#generate').click();await large.locator('#preview').waitFor({state:'visible'});
+ assert.equal(requests.length,largeReads,'Large rule changes must reuse all cached sources');
+ await large.locator('#review').click();assert.match(await large.locator('#confirm-summary').innerText(),/1,658 条失效收藏保留在原夹/);
+ await large.locator('#cancel').click();assert.equal(writes.length,writesBeforeLarge);
+ // A same-count edit in a cached source is caught before any creation or move.
+ folders.get('10').medias[1].id=999999;
+ await large.locator('#review').click();await large.locator('#execute').click();
+ await large.waitForFunction(()=>document.querySelector('#execution-title').textContent==='任务已停止');
+ assert.match(await large.locator('#error').innerText(),/内容或视频状态已变化/);
+ assert.equal(writes.length,writesBeforeLarge);
+ // An all-unavailable source is still readable; execution is disabled.
+ folders=new Map([['10',{id:10,title:'失效来源',medias:[unavailable]}]]);
+ await large.locator('#new-task').click();await large.locator('#connect').click();
+ await large.waitForFunction(()=>document.querySelector('#status').textContent.includes('已读取 1'));
+ await large.locator('#select-all').click();await large.locator('#generate').click();
+ await large.locator('#preview').waitFor({state:'visible'});
+ assert.equal(await large.locator('#video-total').innerText(),'0');
+ assert(await large.locator('#review').isDisabled());assert(await large.locator('#execute').isDisabled());
+ assert.match(await large.locator('#unavailable-summary').innerText(),/1 条已失效/);
+ assert.equal(writes.length,writesBeforeLarge);assert.deepEqual(errors,[]);
+ await large.close();
  console.log('PASS shipped-page integration: no auto-scan; login/list; per-source cache, filtered scope, independent viewing, focus preservation, field validation, read-only browsing, accurate progress, source count sync, responsive drawers and asc/desc; cancellation/Escape; public confirmation; private creation; ordered moves and verification; account invalidation; cooldown; native task lock; SPA entry; background sender validation/single manager; no stored credentials.');
  console.log('LIMITATION: chrome API calls are shimmed; admin policy prevented unpacked installation. Real Chrome/Edge and live Bilibili are not validated.');
+ console.log('PASS large-collection UI: 13 sources/11606 records; long scan and 24-hour review without expiry; cached rule changes; unavailable counts/retention; same-count source change stops before writes; all-unavailable preview is read-only.');
 } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exit(1)});

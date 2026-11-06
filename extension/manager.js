@@ -8,8 +8,7 @@ import { storage, getSession, assertSession, exclusive, prepareTransport } from 
 const $ = id => document.getElementById(id);
 const format = n => Number(n).toLocaleString('zh-CN');
 const time = at => new Date(at).toLocaleTimeString('zh-CN', { hour12: false });
-const CACHE_TTL = 10 * 60 * 1000;
-const cache = new SourceCache({ ttl: CACHE_TTL });
+const cache = new SourceCache();
 const queue = new RequestQueue({ storage });
 let folders = [], selected = new Set(), connectedUid = null, activeId = null, filter = 'all';
 let snapshot = null, plan = null, taskReadback = null, stage = 'selection', busy = false, activeSession = null, identityDirty = false;
@@ -41,7 +40,9 @@ function guarded(action) {
 }
 function selectionKey() { return [...selected].sort().join(','); }
 function fresh(value = snapshot) {
-  return value && value.uid === connectedUid && value.key === selectionKey() && Date.now() - value.at < CACHE_TTL;
+  // A long read/review does not expire the plan. The runner checks the actual
+  // source contents again after confirmation, before creating or moving anything.
+  return value && value.uid === connectedUid && value.key === selectionKey();
 }
 function clearFieldErrors() {
   for (const id of ['capacity', 'base-name']) {
@@ -97,8 +98,8 @@ function updateControls() {
   for (const el of document.querySelectorAll('[data-mutation]')) el.disabled = busy;
   for (const el of document.querySelectorAll('[data-network]')) el.disabled = busy || cooling;
   $('generate').disabled = busy || cooling || !connectedUid || !selected.size;
-  $('review').disabled = busy || cooling || !plan || !fresh();
-  $('execute').disabled = busy || cooling || !plan || !fresh();
+  $('review').disabled = busy || cooling || !plan?.itemCount || !fresh();
+  $('execute').disabled = busy || cooling || !plan?.itemCount || !fresh();
   $('refresh').disabled = busy || cooling || !connectedUid || !selected.size;
   const visible = visibleFolders();
   $('select-all').disabled = busy || !visible.length;
@@ -231,7 +232,8 @@ function fillSourceList(container, exactSnapshot = null) {
   container.replaceChildren(); const visible = new Set(visibleFolders().map(folder => folder.id));
   for (const folder of folders.filter(folder => selected.has(folder.id))) {
     const count = exactSnapshot ? exactSnapshot.items.filter(item => item.sourceId === folder.id).length : folder.count;
-    const row = node('li'); row.append(node('span', folder.title), node('span', `${format(count)} 条${visible.has(folder.id) ? '' : ' · 筛选外'}`)); container.append(row);
+    const skipped = exactSnapshot?.items.filter(item => item.sourceId === folder.id && item.unavailable).length || 0;
+    const row = node('li'); row.append(node('span', folder.title), node('span', `${format(count)} 条${skipped ? ` · ${format(skipped)} 条失效保留` : ''}${visible.has(folder.id) ? '' : ' · 筛选外'}`)); container.append(row);
   }
   if (!selected.size) container.append(node('li', '尚未选择来源。'));
 }
@@ -293,19 +295,28 @@ async function generate(force = false) {
     collected = await cache.collect(session.uid, folders.filter(folder => selected.has(folder.id)), folder => client.resources(folder, pageProgress));
     await assertSession(session);
     if (identityDirty) throw new Error('登录状态已变化，请重新连接。');
-    snapshot = collected; plan = buildPlan(snapshot.items, rules);
+    snapshot = collected; plan = buildPlan(snapshot.items, rules, snapshot.sources);
     const counts = new Map();
     for (const item of collected.items) counts.set(item.sourceId, (counts.get(item.sourceId) || 0) + 1);
     for (const folder of folders.filter(folder => selected.has(folder.id))) folder.count = counts.get(folder.id) || 0;
     lastTask = null; taskReadback = null; metadataStale = false; await saveRules(); renderPlan();
     $('execution-panel').hidden = true; $('preview-content').hidden = false;
     setStage('preview'); status(collected.loaded ? '只读预览已生成。尚未创建收藏夹或移动视频。' : '已复用本次读取数据，没有重新扫描。');
+    if (plan.skippedItems.length) status($('status').textContent + ` ${format(plan.skippedItems.length)} 条失效收藏已跳过，将保留在原收藏夹，不会删除。${plan.itemCount ? '' : '没有可移动的视频。'}`);
     if (plan.missingDates) status($('status').textContent + ` ${plan.missingDates} 条缺少发布时间，已放在所属排序范围末尾。`);
   });
 }
 function renderPlan() {
   $('video-total').textContent = format(plan.itemCount); $('uploader-total').textContent = format(plan.uploaderCount); $('target-total').textContent = plan.chunks.length;
-  $('sample-time').textContent = `最早来源读取于 ${time(snapshot.at)} · 有效至 ${time(snapshot.at + CACHE_TTL)}`;
+  $('sample-time').textContent = `最早来源读取于 ${time(snapshot.at)} · 本次预览生成于 ${time(snapshot.completedAt)}。预览不按时长过期；执行前重新核对来源内容。`;
+  $('unavailable-summary').hidden = !plan.skippedItems.length;
+  $('unavailable-summary').textContent = `共读取 ${format(plan.recordCount)} 条收藏，其中 ${format(plan.itemCount)} 条可移动，${format(plan.skippedItems.length)} 条已失效。失效收藏保留在原夹，不参与分组、移动或删除。`;
+  $('unavailable-details').hidden = !plan.skippedItems.length;
+  $('unavailable-sources').replaceChildren();
+  for (const source of plan.sources) {
+    const count = source.items.filter(item => item.unavailable).length;
+    if (count) $('unavailable-sources').append(node('li', `${source.title}：${format(count)} 条失效收藏，保留在原夹。`));
+  }
   $('plan').replaceChildren(); shown = 0; renderMore();
 }
 function renderMore() {
@@ -326,10 +337,10 @@ function renderMore() {
 }
 function cancel() { $('confirm').close(); status('已取消，预览已保留。没有创建收藏夹、移动视频或刷新页面。'); }
 function review() {
-  if (!fresh() || !plan) throw new Error('预览已过期或失效，请重新生成预览后再执行。');
+  if (!fresh() || !plan?.itemCount) throw new Error('预览已失效或没有可移动的视频，请检查来源并重新生成预览。');
   const r = plan.rules; fillSourceList($('confirm-sources'), snapshot);
   $('confirm-title').textContent = `确认移动 ${format(plan.itemCount)} 条？`;
-  $('confirm-summary').textContent = `${selected.size} 个来源 · ${format(plan.itemCount)} 条收藏记录 → ${plan.chunks.length} 个${r.privacy === 'private' ? '私密' : '公开'}收藏夹。`;
+  $('confirm-summary').textContent = `${selected.size} 个来源 · ${format(plan.itemCount)} 条可移动视频 → ${plan.chunks.length} 个${r.privacy === 'private' ? '私密' : '公开'}收藏夹。${plan.skippedItems.length ? `另有 ${format(plan.skippedItems.length)} 条失效收藏保留在原夹，不会删除。` : ''}执行前将重新读取并核对来源，期间不会创建或移动。`;
   $('confirm-rules').textContent = `${ruleSummary(r)}。目标：${plan.chunks.map(chunk => chunk.name).slice(0, 4).join('、')}${plan.chunks.length > 4 ? ' 等' : ''}。`;
   $('execute').textContent = `确认移动 ${format(plan.itemCount)} 条`; showDialog('confirm');
 }
@@ -369,7 +380,7 @@ function executionProgress(state) {
   }
 }
 async function execute() {
-  if (!fresh() || !plan) { $('confirm').close(); throw new Error('预览已失效，请重新生成。'); }
+  if (!fresh() || !plan?.itemCount) { $('confirm').close(); throw new Error('预览已失效或没有可移动的视频，请重新生成。'); }
   const approved = plan, originalSnapshot = snapshot, sources = folders.filter(folder => selected.has(folder.id)).map(folder => ({ ...folder }));
   taskReadback = originalSnapshot; taskUid = originalSnapshot.uid;
   $('confirm').close(); taskStarted = Date.now(); announcedPhase = ''; $('pending-message').hidden = true;
@@ -384,10 +395,10 @@ async function execute() {
       const result = await executePlan(client, approved, { onProgress: state => { executionProgress(state); renderLocations(state, sources); },
         assertFresh: async () => { if (identityDirty) throw new Error('登录状态已变化，已停止任务。'); await assertSession(session); } });
       folders = result.folders; metadataStale = false;
-      executionProgress({ ...result, phase: '完成', detail: `已移动并核对 ${format(result.verified)} 条，共 ${format(result.moveRequests)} 次移动请求（含中转和校正）。${result.buffer ? ` 空私密中转夹“${result.buffer.title}”已保留，可在 B 站自行删除。` : ''}` });
+      executionProgress({ ...result, phase: '完成', detail: `已移动并核对 ${format(result.verified)} 条，共 ${format(result.moveRequests)} 次移动请求（含中转和校正）。${result.skipped ? ` ${format(result.skipped)} 条失效收藏已保留在原夹，未删除。` : ''}${result.buffer ? ` 空私密中转夹“${result.buffer.title}”已保留，可在 B 站自行删除。` : ''}` });
       $('execution-title').textContent = '整理完成'; $('page-title').textContent = '整理完成'; $('execution-state').textContent = '已完成';
       $('execution-message').classList.add('success'); $('list-updated').textContent = '列表更新于 ' + time(Date.now());
-      status(`整理完成：已移动并核对 ${format(result.verified)} 条，来源归属检查通过。再次整理需要生成新预览。`);
+      status(`整理完成：已移动并核对 ${format(result.verified)} 条，来源归属检查通过。${result.skipped ? `${format(result.skipped)} 条失效收藏已保留在原夹，未删除。` : ''}再次整理需要生成新预览。`);
     });
   } catch (error) {
     executionProgress({ ...(error.state || lastTask), phase: '任务已停止', detail: error.message });
@@ -404,9 +415,6 @@ function updateCooldown() {
   const seconds = Math.max(0, Math.ceil((queue.cooldownUntil - Date.now()) / 1000));
   $('cooldown-panel').hidden = !seconds;
   if (seconds) $('cooldown-text').textContent = `至少 ${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')} 后才允许再次尝试。`;
-  if (snapshot && !fresh() && !busy && stage === 'preview' && !lastTask) {
-    $('sample-time').textContent = '预览已过期，请重新生成。'; $('generate').hidden = false; $('review').disabled = true;
-  }
   updateControls();
 }
 function resetIdentity() {
