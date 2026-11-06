@@ -1,6 +1,6 @@
 # Bilibili 收藏夹整理
 
-![Version](https://img.shields.io/badge/Version-1.2.1-0069D2)
+![Version](https://img.shields.io/badge/Version-1.3.0-0069D2)
 ![Chrome](https://img.shields.io/badge/Chrome-116%2B-4285F4)
 ![Edge](https://img.shields.io/badge/Edge-116%2B-0078D7)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-34A853)
@@ -45,7 +45,7 @@
 ### 整理与预览
 
 1. **两个入口，一个管理页**：点击扩展工具栏图标，或 B 站收藏夹页面的“整理收藏夹 ↗”控件，均可打开同一个独立标签页。
-2. **查看与批量范围分开**：点击名称查看摘要，勾选框加入整理；名称搜索、全部 / 已选 / 空夹筛选均为本地操作。“全选筛选结果”只选择当前可见范围，筛选外的已选来源始终可审查。
+2. **查看与批量范围分开**：点击名称查看摘要，勾选框加入整理；名称搜索、全部 / 已选 / 空夹筛选均为本地操作。支持鼠标拖动框选加入范围，Ctrl / ⌘ 拖动反选，Esc 撤销本次框选；拖至列表上下边缘自动滚动，也可配合滚轮。框选与“全选筛选结果”只作用于当前筛选结果，保留筛选外已选来源。触屏可直接滑动与勾选。
 3. **可配置整理规则**：支持 UP 主聚合与排列、允许拆分、发布时间升降序、自定义容量和目标可见性。
 4. **先预览，再执行**：展示目标数量、UP 主分配及前几条视频的顺序，明确确认后才创建和移动。
 5. **按来源复用读取数据**：同账号当前页内持续保留，读取或预览超过 10 分钟也不会过期；移除再选回不重复扫描，新增来源只读缺失部分，修改规则直接重算。执行前重新核对全部来源内容，取消确认不写入。
@@ -123,7 +123,7 @@
 
 ### 本地安装（当前方式）
 
-在 GitHub 当前分支点击 **Code → Download ZIP** 获取源码并解压。也可以在本机通过 `npm run pack` 生成 `bilibili-favorites-organizer-1.2.1.zip` 后解压安装。
+在 GitHub 当前分支点击 **Code → Download ZIP** 获取源码并解压。也可以在本机通过 `npm run pack` 生成 `bilibili-favorites-organizer-1.3.0.zip` 后解压安装。
 
 - 使用仓库源码：选择解压后的 **`extension/` 目录**。
 - 使用打包产物：选择解压后**直接包含 `manifest.json` 的目录**。
@@ -163,7 +163,7 @@
 
 1. 在同一浏览器的普通窗口登录 B 站，停用旧油猴脚本。
 2. 点击扩展图标，或在 `https://space.bilibili.com/<mid>/favlist` 页面点击 **整理收藏夹 ↗**。
-3. 点击 **连接并读取列表**。点击名称只查看，勾选框加入整理；搜索或筛选不会改变已选范围。打开管理页本身不会扫描视频。
+3. 点击 **连接并读取列表**。点击名称只查看，勾选框或鼠标拖动框选加入整理；拖到列表上下边缘会自动滚动。Ctrl / ⌘ 框选反选，Esc 取消本次框选，搜索或筛选保留其他来源的选择。打开管理页本身不会扫描视频。
 4. 调整规则，点击 **生成整理预览**，核对容量、分组和目标可见性。
 5. 检查所有来源（包含筛选外来源）、目标、排序与可见性。如需修改，返回调整规则；如暂不执行，取消确认保留预览。
 6. 确认计划后开始移动，保持管理页打开，可切换到其他标签页。
@@ -262,7 +262,7 @@ npm run benchmark
 npm run pack
 ```
 
-打包产物位于 `dist/bilibili-favorites-organizer-1.2.1.zip`，生成的 ZIP 不提交到 Git。
+打包产物位于 `dist/bilibili-favorites-organizer-1.3.0.zip`，生成的 ZIP 不提交到 Git。
 
 <details>
 <summary>浏览器模拟集成检查</summary>
@@ -272,6 +272,8 @@ npm run pack
 ```sh
 npm install --prefix /tmp/bfo-browser-tools --no-package-lock --no-save playwright@1.56.1
 BROWSER_TOOLS_DIR=/tmp/bfo-browser-tools npm run test:browser
+# 只检查目录框选、滚动、筛选、键盘与触屏
+BROWSER_TOOLS_DIR=/tmp/bfo-browser-tools npm run test:selection
 ```
 
 默认 Chromium 路径为 `/usr/bin/chromium`，可通过 `CHROMIUM_PATH` 调整；截图输出目录可通过 `BROWSER_ARTIFACTS_DIR` 指定。

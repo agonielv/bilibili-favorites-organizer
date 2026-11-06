@@ -97,3 +97,9 @@ dialog.confirm-card{width:600px;background:linear-gradient(135deg,#fffffff5,#f6e
 @media(prefers-reduced-transparency:reduce){.shell,.pane,.actionbar,dialog{backdrop-filter:none!important;background:#f0edf6!important}dialog::backdrop{backdrop-filter:none!important}}
 
 .stopped-title,.badge-stopped{display:none}
+
+.folder-list{position:relative;user-select:none;overscroll-behavior:contain}
+.folder-row.selected{border-color:#8f77d4;background:rgba(230,222,255,.48)}
+.folder-row.selected.active{box-shadow:var(--inset),inset 3px 0 0 var(--accent)}
+.folder-selection-box{position:absolute;z-index:2;pointer-events:none;border:1px solid var(--accent);border-radius:4px;background:rgba(97,70,198,.14)}
+.folder-list.is-selecting,.folder-list.is-selecting button,.folder-list.is-selecting input{cursor:crosshair}

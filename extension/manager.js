@@ -2,6 +2,7 @@ import { DEFAULT_RULES, validateRules, buildPlan } from './lib/planner.js';
 import { RequestQueue, COOLDOWN_KEY } from './lib/request.js';
 import { BiliClient } from './lib/client.js';
 import { SourceCache } from './lib/source-cache.js';
+import { attachFolderSelection } from './lib/folder-selection.js';
 import { executePlan } from './lib/runner.js';
 import { storage, getSession, assertSession, exclusive, prepareTransport } from './lib/platform.js';
 
@@ -14,6 +15,8 @@ let folders = [], selected = new Set(), connectedUid = null, activeId = null, fi
 let snapshot = null, plan = null, taskReadback = null, stage = 'selection', busy = false, activeSession = null, identityDirty = false;
 let keepPreference = true, pages = 0, shown = 0, metadataStale = false, lastTask = null, taskStarted = 0, taskUid = null;
 let announcedPhase = '', lastAnnouncement = 0;
+let folderSelection;
+let lastFolderAnnouncement = 0;
 const client = new BiliClient(queue, async () => {
   if (!activeSession || identityDirty) throw new Error('登录状态已变化，请重新连接并生成预览。');
   return assertSession(activeSession);
@@ -109,6 +112,7 @@ function updateControls() {
   syncRules();
 }
 function setBusy(value) {
+  if (value) folderSelection?.cancel();
   busy = value;
   // Read-only browsing, local filters, and help stay available during a task.
   updateControls(); renderFolders();
@@ -132,6 +136,7 @@ function visibleFolders() {
     (filter !== 'selected' || selected.has(folder.id)) && (filter !== 'empty' || folder.count === 0));
 }
 function renderFolders() {
+  folderSelection?.cancel();
   const container = $('folders'), focused = document.activeElement, visible = visibleFolders();
   const rows = new Map([...container.querySelectorAll('.folder-row')].map(row => [row.dataset.folderId, row]));
   const keep = new Set(visible.map(folder => folder.id));
@@ -154,6 +159,7 @@ function renderFolders() {
       row.append(checkLabel, view, node('span', '', 'folder-count'));
     }
     row.classList.toggle('active', activeId === folder.id);
+    row.classList.toggle('selected', selected.has(folder.id));
     const check = row.querySelector('input'); check.checked = selected.has(folder.id); check.disabled = busy;
     check.setAttribute('aria-label', '选择收藏夹 ' + folder.title);
     row.querySelector('.folder-title').textContent = folder.title;
@@ -418,6 +424,7 @@ function updateCooldown() {
   updateControls();
 }
 function resetIdentity() {
+  folderSelection.cancel();
   folders = []; selected.clear(); activeId = null; connectedUid = null; snapshot = null; plan = null; taskReadback = null; cache.clear(null);
   $('account-label').textContent = '登录已变化'; $('connect').textContent = '连接并读取列表';
   renderFolders(); status('登录状态已变化，请重新连接；旧预览不能再次执行。');
@@ -427,14 +434,37 @@ async function openFavorites() {
 }
 async function changeScope(mode) {
   if (busy) return;
+  folderSelection.cancel();
   const scope = mode === 'all' || mode === 'clear' ? folders : visibleFolders();
   for (const folder of scope) { if (mode === 'all' || mode === 'visible') selected.add(folder.id); else selected.delete(folder.id); }
   $('scope-menu').open = false; invalidatePlan(); renderFolders(); await saveSelection();
 }
-function newTask() { if (busy) return; lastTask = null; taskReadback = null; plan = null; snapshot = null; $('error').textContent = ''; setStage('selection'); renderFolders(); status('请选择来源并生成新预览。'); }
+function newTask() { if (busy) return; folderSelection.cancel(); lastTask = null; taskReadback = null; plan = null; snapshot = null; $('error').textContent = ''; setStage('selection'); renderFolders(); status('请选择来源并生成新预览。'); }
 function rulesChanged() {
-  if (busy) return; clearFieldErrors(); invalidatePlan(); syncRules(); renderScope(); void saveRules();
+  if (busy) return; folderSelection.cancel(); clearFieldErrors(); invalidatePlan(); syncRules(); renderScope(); void saveRules();
 }
+folderSelection = attachFolderSelection($('folders'), {
+  enabled: () => !!connectedUid && !busy,
+  getSelected: () => selected,
+  onPreview: next => {
+    selected = next;
+    for (const row of $('folders').querySelectorAll('.folder-row')) {
+      const checked = selected.has(row.dataset.folderId);
+      row.querySelector('input').checked = checked; row.classList.toggle('selected', checked);
+    }
+    $('selection-count').textContent = '已选 ' + selected.size + ' 个';
+    $('folders-open').textContent = `收藏夹目录 · 已选 ${selected.size} 个`;
+    renderScope(); renderActive(); updateControls();
+    if (Date.now() - lastFolderAnnouncement > 250) {
+      status(`正在框选：已选 ${selected.size} 个收藏夹。松开鼠标确认，Esc 撤销本次框选。`); lastFolderAnnouncement = Date.now();
+    }
+  },
+  onFinish: ({ changed, cancelled }) => {
+    if (changed) { invalidatePlan(); void saveSelection().catch(report); }
+    renderFolders();
+    status(`${cancelled ? '已撤销本次框选，保留原选择。' : ''}已选 ${selected.size} 个收藏夹。框选只修改整理范围，没有读取或移动视频。`);
+  },
+});
 $('connect').onclick = guarded(connect); $('generate').onclick = guarded(() => generate()); $('refresh').onclick = guarded(() => generate(true));
 $('review').onclick = guarded(review); $('execute').onclick = guarded(execute); $('cancel').onclick = cancel;
 $('confirm').addEventListener('cancel', event => { event.preventDefault(); cancel(); });
