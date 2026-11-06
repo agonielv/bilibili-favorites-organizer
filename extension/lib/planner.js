@@ -42,12 +42,18 @@ export function buildPlan(items, inputRules, sourceFolders = []) {
   }
   const skippedItems = items.filter(item => item.unavailable);
   items = items.filter(item => !item.unavailable);
-  const resources = new Set();
+  const resources = new Set(), sourceResources = new Set(), uniqueItems = [], retainedItems = [];
   const grouped = new Map();
   for (const item of items) {
     const key = `${item.id}:${item.type}`;
-    if (resources.has(key)) throw new Error('同一视频出现在多个所选源收藏夹中。为避免丢失归属或重复移动，请分别选择这些收藏夹；本版不自动去重。');
+    const sourceKey = `${item.sourceId}:${key}`;
+    if (sourceResources.has(sourceKey)) throw new Error('同一源收藏夹返回了重复视频，请重新读取来源。');
+    sourceResources.add(sourceKey);
+    // Sources arrive in directory order. Move the first available membership;
+    // leave duplicate memberships in their original sources.
+    if (resources.has(key)) { retainedItems.push(item); continue; }
     resources.add(key);
+    uniqueItems.push(item);
     if (!grouped.has(item.uploaderId)) grouped.set(item.uploaderId, { id: item.uploaderId, name: item.uploaderName, items: [] });
     grouped.get(item.uploaderId).items.push(item);
   }
@@ -55,7 +61,7 @@ export function buildPlan(items, inputRules, sourceFolders = []) {
   if (rules.group) {
     for (const group of groups) group.items.sort(compareVideos(rules.time));
     groups.sort((a, b) => (rules.groupOrder === 'name' ? 0 : (rules.groupOrder === 'count-asc' ? 1 : -1) * (a.items.length - b.items.length)) || collator.compare(a.name, b.name) || collator.compare(a.id, b.id));
-  } else groups = [{ name: '', items: [...items].sort(compareVideos(rules.time)) }];
+  } else groups = [{ name: '', items: [...uniqueItems].sort(compareVideos(rules.time)) }];
   const chunks = [];
   let current = [];
   for (const group of groups) {
@@ -73,8 +79,8 @@ export function buildPlan(items, inputRules, sourceFolders = []) {
     }
   }
   if (current.length) chunks.push(current);
-  return { rules, sources: [...sources.values()], skippedItems, recordCount: items.length + skippedItems.length,
-    itemCount: items.length, uploaderCount: grouped.size, missingDates: items.filter(i => !i.publishedAt).length,
+  return { rules, sources: [...sources.values()], skippedItems, retainedItems, recordCount: items.length + skippedItems.length,
+    itemCount: uniqueItems.length, uploaderCount: grouped.size, missingDates: uniqueItems.filter(i => !i.publishedAt).length,
     chunks: chunks.map((items, index) => ({ name: rules.base + (chunks.length > 1 ? `-${index + 1}` : ''), items })) };
 }
 // Never merge nonadjacent source segments just to obtain a larger batch.

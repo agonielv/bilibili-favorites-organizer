@@ -41,11 +41,26 @@ test('unknown dates stay last in both directions, ties fall back deterministical
   assert.deepEqual(ids(buildPlan(input, { time: 'desc' }).chunks[0]), ['2','3','1']);
   assert.deepEqual(ids(buildPlan(input, { time: 'asc' }).chunks[0]), ['2','1','3']);
 });
-test('invalid rules, duplicate source references, and non-video resources are rejected', () => {
+test('invalid rules, repeated records within one source, and non-video resources are rejected', () => {
   for (const capacity of [0, 1001, 1.5, NaN]) assert.throws(() => buildPlan([item(1)], { capacity }));
   assert.throws(() => buildPlan([item(1)], { privacy: 'bad' }));
-  assert.throws(() => buildPlan([item(1), item(1, 7, 1, '11')]), /同一视频/);
+  assert.throws(() => buildPlan([item(1), item(1)]), /同一源收藏夹/);
   assert.throws(() => normalizeMedia({ id: 1, type: 12 }, { id: 10, title: '源' }), /非视频/);
+});
+test('cross-source duplicates move the first occurrence and keep other memberships in grouped and flat modes', () => {
+  const input = [item(1,7,0), item(2,8,2), item(1,7,100,'11'), item(3,8,3,'11'), item(2,8,2,'12')];
+  const before = structuredClone(input);
+  for (const group of [true, false]) {
+    const plan = buildPlan(input, { group, capacity: 2 });
+    const moved = plan.chunks.flatMap(chunk => chunk.items);
+    assert.equal(plan.itemCount, 3); assert.equal(plan.uploaderCount, 2); assert.equal(plan.missingDates, 1);
+    assert.equal(plan.chunks.length, 2);
+    assert.equal(moved.find(item => item.id === '1').sourceId, '10');
+    assert.equal(new Set(moved.map(item => item.id)).size, 3);
+    assert.deepEqual(plan.retainedItems.map(item => [item.id, item.sourceId]), [['1','11'], ['2','12']]);
+    assert.deepEqual(plan.sources.map(source => [source.id, source.items.length]), [['10',2], ['11',2], ['12',1]]);
+  }
+  assert.deepEqual(input, before);
 });
 test('6000-item planner honors capacity and uploader boundaries', () => {
   const input = Array.from({ length: 6000 }, (_, n) => item(n + 1, Math.floor(n / 500)));

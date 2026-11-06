@@ -1,6 +1,6 @@
 # Bilibili 收藏夹整理
 
-![Version](https://img.shields.io/badge/Version-1.3.0-0069D2)
+![Version](https://img.shields.io/badge/Version-1.3.1-0069D2)
 ![Chrome](https://img.shields.io/badge/Chrome-116%2B-4285F4)
 ![Edge](https://img.shields.io/badge/Edge-116%2B-0078D7)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-34A853)
@@ -123,7 +123,7 @@
 
 ### 本地安装（当前方式）
 
-在 GitHub 当前分支点击 **Code → Download ZIP** 获取源码并解压。也可以在本机通过 `npm run pack` 生成 `bilibili-favorites-organizer-1.3.0.zip` 后解压安装。
+在 GitHub 当前分支点击 **Code → Download ZIP** 获取源码并解压。也可以在本机通过 `npm run pack` 生成 `bilibili-favorites-organizer-1.3.1.zip` 后解压安装。
 
 - 使用仓库源码：选择解压后的 **`extension/` 目录**。
 - 使用打包产物：选择解压后**直接包含 `manifest.json` 的目录**。
@@ -219,9 +219,9 @@ HTTP 412 / 429 或识别到接口风控时，扩展立即停止，至少冷却 6
 <details>
 <summary>哪些收藏暂时不能一起处理？</summary>
 
-本版仅处理视频。失效视频仍计入读取总数，随后跳过并保留在原夹，其余视频正常整理；预览与确认会列出失效数量。没有自动清理或删除失效收藏的功能。发现非视频资源、同一可移动视频出现在多个所选源收藏夹，或目标名称已存在时，会停止并说明；不自动去重、合并或删除。
+本版仅处理视频。失效视频仍计入读取总数，随后跳过并保留在原夹，其余视频正常整理；预览与确认会列出失效数量。没有自动清理或删除失效收藏的功能。发现非视频资源或目标名称已存在时，会停止并说明；不自动合并或删除收藏夹。
 
-可以分别处理含重复视频的源收藏夹，或修改目标基础名称后重新生成预览。
+同一视频出现在多个所选源收藏夹时，按左侧列表顺序只移动第一份有效副本，其余副本留在各自原收藏夹。分组、容量和移动进度按实际移动的唯一视频计算，预览与执行确认会说明重复记录的保留数量，执行后按来源核对移动与保留归属。
 
 </details>
 
@@ -262,7 +262,11 @@ npm run benchmark
 npm run pack
 ```
 
-打包产物位于 `dist/bilibili-favorites-organizer-1.3.0.zip`，生成的 ZIP 不提交到 Git。
+打包产物位于 `dist/bilibili-favorites-organizer-1.3.1.zip`，同时保存到 [`packages/`](packages/README.md)，附带 SHA-256。每次成品包随源码一起更新到 GitHub。
+
+[下载最新成品包 v1.3.1](packages/bilibili-favorites-organizer-1.3.1.zip)
+
+项目已安装 [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 到 `.agents/skills/ui-ux-pro-max/`，用于后续界面与交互工作；技能不进入扩展成品包。
 
 <details>
 <summary>浏览器模拟集成检查</summary>

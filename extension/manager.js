@@ -199,7 +199,8 @@ function renderScope() {
   const exact = fresh(), total = exact ? snapshot.items.length : sources.reduce((n, folder) => n + folder.count, 0);
   $('source-total').textContent = selected.size; $('selection-total').textContent = format(total);
   $('total-label').textContent = metadataStale ? '任务前数量 · 待核对' : exact ? '已读取收藏记录' : '预计收藏记录';
-  $('scope-total').textContent = stage === 'preview' && lastTask ? `本次整理 ${selected.size} 个来源 · ${format(lastTask.total)} 条` :
+  $('scope-total').textContent = stage === 'preview' && plan && !lastTask ? `本次整理 ${selected.size} 个来源 · 移动 ${format(plan.itemCount)} 条${plan.retainedItems.length ? ` · 保留 ${format(plan.retainedItems.length)} 条重复记录` : ''}` :
+    stage === 'preview' && lastTask ? `本次整理 ${selected.size} 个来源 · ${format(lastTask.total)} 条` :
     `本次已选 ${selected.size} 个收藏夹 · ${exact ? '' : '预计 '}${format(total)} 条${metadataStale ? '（任务前）' : ''}`;
   const visible = new Set(visibleFolders().map(folder => folder.id)), hidden = sources.filter(source => !visible.has(source.id)).length;
   $('bottom-scope').textContent = `${hidden ? `包含 ${hidden} 个筛选外来源 · ` : ''}查看全部已选来源`;
@@ -314,9 +315,11 @@ async function generate(force = false) {
 }
 function renderPlan() {
   $('video-total').textContent = format(plan.itemCount); $('uploader-total').textContent = format(plan.uploaderCount); $('target-total').textContent = plan.chunks.length;
+  $('duplicate-note').hidden = !plan.retainedItems.length;
+  $('duplicate-note').textContent = duplicateSummary(plan);
   $('sample-time').textContent = `最早来源读取于 ${time(snapshot.at)} · 本次预览生成于 ${time(snapshot.completedAt)}。预览不按时长过期；执行前重新核对来源内容。`;
   $('unavailable-summary').hidden = !plan.skippedItems.length;
-  $('unavailable-summary').textContent = `共读取 ${format(plan.recordCount)} 条收藏，其中 ${format(plan.itemCount)} 条可移动，${format(plan.skippedItems.length)} 条已失效。失效收藏保留在原夹，不参与分组、移动或删除。`;
+  $('unavailable-summary').textContent = `共读取 ${format(plan.recordCount)} 条收藏，其中 ${format(plan.itemCount)} 条视频将移动，${format(plan.skippedItems.length)} 条已失效${plan.retainedItems.length ? `，另有 ${format(plan.retainedItems.length)} 条重复收藏记录` : ''}。失效收藏保留在原夹，不参与分组、移动或删除。`;
   $('unavailable-details').hidden = !plan.skippedItems.length;
   $('unavailable-sources').replaceChildren();
   for (const source of plan.sources) {
@@ -324,6 +327,9 @@ function renderPlan() {
     if (count) $('unavailable-sources').append(node('li', `${source.title}：${format(count)} 条失效收藏，保留在原夹。`));
   }
   $('plan').replaceChildren(); shown = 0; renderMore();
+}
+function duplicateSummary(value) {
+  return value.retainedItems.length ? `重复视频按左侧列表顺序只移动第一份有效副本；其余 ${format(value.retainedItems.length)} 条重复收藏记录保留在各自源收藏夹。` : '';
 }
 function renderMore() {
   const end = Math.min(shown + 50, plan.chunks.length);
@@ -347,6 +353,7 @@ function review() {
   const r = plan.rules; fillSourceList($('confirm-sources'), snapshot);
   $('confirm-title').textContent = `确认移动 ${format(plan.itemCount)} 条？`;
   $('confirm-summary').textContent = `${selected.size} 个来源 · ${format(plan.itemCount)} 条可移动视频 → ${plan.chunks.length} 个${r.privacy === 'private' ? '私密' : '公开'}收藏夹。${plan.skippedItems.length ? `另有 ${format(plan.skippedItems.length)} 条失效收藏保留在原夹，不会删除。` : ''}执行前将重新读取并核对来源，期间不会创建或移动。`;
+  $('confirm-summary').textContent += duplicateSummary(plan);
   $('confirm-rules').textContent = `${ruleSummary(r)}。目标：${plan.chunks.map(chunk => chunk.name).slice(0, 4).join('、')}${plan.chunks.length > 4 ? ' 等' : ''}。`;
   $('execute').textContent = `确认移动 ${format(plan.itemCount)} 条`; showDialog('confirm');
 }
@@ -392,7 +399,7 @@ async function execute() {
   $('confirm').close(); taskStarted = Date.now(); announcedPhase = ''; $('pending-message').hidden = true;
   $('execution-state').textContent = '进行中'; $('execution-message').className = 'task-explanation';
   executionProgress({ phase: '准备执行', confirmed: 0, verified: 0, total: approved.itemCount, moveRequests: 0, detail: '正在核对登录状态与执行计划…' });
-  $('task-scope-summary').textContent = `${sources.length} 个来源 · ${format(approved.itemCount)} 条 → ${approved.chunks.length} 个目标`;
+  $('task-scope-summary').textContent = `${sources.length} 个来源 · ${format(approved.itemCount)} 条 → ${approved.chunks.length} 个目标。${duplicateSummary(approved)}`;
   $('task-rule-summary').textContent = ruleSummary(approved.rules); setStage('preview', false);
   try {
     await task(async session => {
@@ -401,10 +408,10 @@ async function execute() {
       const result = await executePlan(client, approved, { onProgress: state => { executionProgress(state); renderLocations(state, sources); },
         assertFresh: async () => { if (identityDirty) throw new Error('登录状态已变化，已停止任务。'); await assertSession(session); } });
       folders = result.folders; metadataStale = false;
-      executionProgress({ ...result, phase: '完成', detail: `已移动并核对 ${format(result.verified)} 条，共 ${format(result.moveRequests)} 次移动请求（含中转和校正）。${result.skipped ? ` ${format(result.skipped)} 条失效收藏已保留在原夹，未删除。` : ''}${result.buffer ? ` 空私密中转夹“${result.buffer.title}”已保留，可在 B 站自行删除。` : ''}` });
+      executionProgress({ ...result, phase: '完成', detail: `已移动并核对 ${format(result.verified)} 条，共 ${format(result.moveRequests)} 次移动请求（含中转和校正）。${result.retained ? ` ${format(result.retained)} 条重复收藏记录已保留在原夹。` : ''}${result.skipped ? ` ${format(result.skipped)} 条失效收藏已保留在原夹，未删除。` : ''}${result.buffer ? ` 空私密中转夹“${result.buffer.title}”已保留，可在 B 站自行删除。` : ''}` });
       $('execution-title').textContent = '整理完成'; $('page-title').textContent = '整理完成'; $('execution-state').textContent = '已完成';
       $('execution-message').classList.add('success'); $('list-updated').textContent = '列表更新于 ' + time(Date.now());
-      status(`整理完成：已移动并核对 ${format(result.verified)} 条，来源归属检查通过。${result.skipped ? `${format(result.skipped)} 条失效收藏已保留在原夹，未删除。` : ''}再次整理需要生成新预览。`);
+      status(`整理完成：已移动并核对 ${format(result.verified)} 条，来源归属检查通过。${result.retained ? `${format(result.retained)} 条重复收藏记录已保留在原夹。` : ''}${result.skipped ? `${format(result.skipped)} 条失效收藏已保留在原夹，未删除。` : ''}再次整理需要生成新预览。`);
     });
   } catch (error) {
     executionProgress({ ...(error.state || lastTask), phase: '任务已停止', detail: error.message });

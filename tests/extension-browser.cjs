@@ -26,7 +26,7 @@ const initial = [
 ];
 const unavailable = { id: 107, type: 2, attr: 9, title: '已失效视频', upper: null, pubtime: 0 };
 let folders = new Map();
-function resetData() { folders = new Map([['10',{id:10,title:'源 A',medias:[initial[0],initial[1],initial[3],unavailable]}],['11',{id:11,title:'源 B',medias:[initial[2],initial[4],initial[5]]}]]); nextId = 20; }
+function resetData() { folders = new Map([['10',{id:10,title:'源 A',medias:[initial[0],initial[1],initial[3],unavailable]}],['11',{id:11,title:'源 B',medias:[initial[2],initial[4],initial[5],initial[0]]}]]); nextId = 20; }
 resetData();
 async function checkBackground() {
   let listener, onClick, created = 0, updated = 0, rules;
@@ -100,12 +100,14 @@ try {
  assert(await page.locator('#search').isEnabled());assert(await page.locator('#nav-help').isEnabled());assert(await firstCheck.isDisabled());
  await page.locator('#nav-help').click();await page.locator('#help-back').click();holdReads=false;releaseRead();
  await page.locator('#preview').waitFor({state:'visible'});assert.equal(await page.locator('#video-total').innerText(),'6');
- assert.match(await page.locator('#unavailable-summary').innerText(),/共读取 7 条收藏.*6 条可移动.*1 条已失效/);
+ assert.match(await page.locator('#unavailable-summary').innerText(),/共读取 8 条收藏.*6 条视频将移动.*1 条已失效.*1 条重复收藏记录/);
  await page.locator('#unavailable-details summary').click();
  assert.match(await page.locator('#unavailable-sources').innerText(),/源 A：1 条/);
+ assert.match(await page.locator('#duplicate-note').innerText(),/其余 1 条.*保留/);
+ assert.match(await page.locator('#scope-total').innerText(),/移动 6 条.*保留 1 条/);
  await page.screenshot({path:path.join(output,'extension-preview.png'),fullPage:true});
  const reads=requests.length;
- await page.locator('#review').click();assert.match(await page.locator('#confirm-sources').innerText(),/源 A/);assert.match(await page.locator('#confirm-sources').innerText(),/源 B/);await page.screenshot({path:path.join(output,'extension-confirmation.png'),fullPage:true});await page.locator('#cancel').click();assert.equal(writes.length,0);assert.equal(await page.locator('#preview').isVisible(),true);
+ await page.locator('#review').click();assert.match(await page.locator('#confirm-sources').innerText(),/源 A/);assert.match(await page.locator('#confirm-sources').innerText(),/源 B/);await page.screenshot({path:path.join(output,'extension-confirmation.png'),fullPage:true});assert.match(await page.locator('#confirm-summary').innerText(),/其余 1 条.*保留/);await page.locator('#cancel').click();assert.equal(writes.length,0);assert.equal(await page.locator('#preview').isVisible(),true);
  await page.locator('#back').click();await firstCheck.uncheck();await firstCheck.check();
  await page.locator('#capacity').fill('1001');await page.locator('#generate').click();assert.equal(await page.locator('#capacity').getAttribute('aria-invalid'),'true');assert.match(await page.locator('#capacity-error').innerText(),/1–1000/);await page.locator('#capacity').fill('1000');
  await page.locator('[name=time-order][value=asc]').check();await page.locator('#generate').click();await page.locator('#preview').waitFor({state:'visible'});assert.equal(requests.length,reads,'Rule changes reuse snapshot');
@@ -122,9 +124,11 @@ try {
  holdVerification=false;releaseVerification();await page.waitForFunction(()=>document.querySelector('#execution-title').textContent==='整理完成',{},{timeout:30000});
  assert.equal(writes.filter(w=>w.type==='move').length,3);assert(writes.some(w=>w.type==='move'&&w.ids.length>1));assert.equal(writes[0].privacy,'1');assert.deepEqual(folders.get('20').medias.map(m=>m.id),[102,104,101,105,103,106]);assert(await page.locator('#review').isDisabled());
  assert(requests.every((r,i)=>!i||r.at-requests[i-1].at>=1100),'Production queue must actually pace requests');
- assert.equal(await page.locator('#selection-total').innerText(),'1','Successful execution must synchronize counts including retained unavailable videos');
+ assert.equal(await page.locator('#selection-total').innerText(),'2','Successful execution must synchronize counts including retained unavailable and duplicate videos');
  assert.deepEqual(folders.get('10').medias.map(media=>media.id),[107]);
  assert.match(await page.locator('#execution-message').innerText(),/1 条失效收藏已保留在原夹/);
+ assert.deepEqual(folders.get('11').medias.map(media=>media.id),[101]);
+ assert.match(await page.locator('#status').innerText(),/1 条重复收藏记录已保留/);
  await page.screenshot({path:path.join(output,'extension-execution.png'),fullPage:true});
  // Exercise staging + payload-direction calibration through the shipped page/modules.
  const staged=Array.from({length:48},(_,i)=>({id:1001+i,title:'批量示例 '+i,pubtime:(i*7)%48+1,upper:{mid:7,name:'Stage UP'}}));

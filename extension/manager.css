@@ -103,3 +103,5 @@ dialog.confirm-card{width:600px;background:linear-gradient(135deg,#fffffff5,#f6e
 .folder-row.selected.active{box-shadow:var(--inset),inset 3px 0 0 var(--accent)}
 .folder-selection-box{position:absolute;z-index:2;pointer-events:none;border:1px solid var(--accent);border-radius:4px;background:rgba(97,70,198,.14)}
 .folder-list.is-selecting,.folder-list.is-selecting button,.folder-list.is-selecting input{cursor:crosshair}
+
+#duplicate-note{margin-top:14px}

@@ -89,6 +89,41 @@ test('a copy-like response is not mistaken for a successful move',async()=>{
   client.move=async(op,id)=>{const before=client.data.get(op.sourceId).items.filter(i=>op.items.some(candidate=>candidate.id===i.id)).map(i=>({...i}));await original(op,id);client.data.get(op.sourceId).items.push(...before);};
   await assert.rejects(executePlan(client,buildPlan(items,{})),/仍在原收藏夹/);
 });
+for (const staged of [false, true]) test(`duplicates keep their other source memberships (${staged ? 'staged' : 'direct'} transfer)`, async () => {
+  const unique = dataset(staged ? 180 : 8, true);
+  const duplicates = unique.filter((_, i) => i % 3 === 0).map(item => ({ ...item, sourceId: '11' }));
+  const onlyRetained = unique.slice(0, 4).map(item => ({ ...item, sourceId: '99' }));
+  const items = [...unique, ...duplicates, ...onlyRetained], plan = buildPlan(items, { capacity: 60, keep: false });
+  const client = new MemoryClient(items), result = await executePlan(client, plan);
+  assert.equal(result.verified, unique.length);
+  for (const { id } of plan.sources) {
+    assert.deepEqual(client.data.get(id).items.map(item => item.id), plan.retainedItems.filter(item => item.sourceId === id).map(item => item.id));
+  }
+  for (let i = 0; i < plan.chunks.length; i++) assert.deepEqual(client.data.get(result.created[i].id).items.map(item => item.id), plan.chunks[i].items.map(item => item.id));
+  assert(!client.events.some(event => event.type === 'move' && event.sourceId === '99'));
+  if (staged) assert(result.buffer);
+});
+test('retained-only source count changes stop execution before creating anything', async () => {
+  const items = [makeItem(1), makeItem(1, '11')], client = new MemoryClient(items), plan = buildPlan(items, {});
+  client.data.get('11').items = [];
+  await assert.rejects(executePlan(client, plan), /数量已变化/);
+  assert(!client.events.some(event => event.type === 'create' || event.type === 'move'));
+});
+test('missing retained duplicates are detected during final source verification', async () => {
+  const items = [makeItem(1), makeItem(2, '11'), makeItem(1, '11')], client = new MemoryClient(items);
+  const original = client.move.bind(client);
+  client.move = async (operation, target) => { await original(operation, target); client.data.get('11').items = client.data.get('11').items.filter(item => item.id !== '1'); };
+  await assert.rejects(executePlan(client, buildPlan(items, {})), /应保留在来源/);
+});
+test('a copy-like response is still rejected when the same video is intentionally retained in another source', async () => {
+  const items = [makeItem(1), makeItem(2, '11'), makeItem(1, '11')], client = new MemoryClient(items);
+  const original = client.move.bind(client);
+  client.move = async (operation, target) => {
+    const copies = operation.items.map(item => ({ ...item })); await original(operation, target);
+    client.data.get(operation.sourceId).items.push(...copies);
+  };
+  await assert.rejects(executePlan(client, buildPlan(items, {})), /仍在原收藏夹/);
+});
 test('risk during verification halts after a successful write and reports the pending batch',async()=>{
   const items=dataset(12),client=new MemoryClient(items);
   client.inspect=async()=>{throw Object.assign(new Error('限流'),{rateLimited:true})};
