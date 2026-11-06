@@ -1,6 +1,6 @@
 # 成品包
 
-[下载 v1.3.2](./bilibili-favorites-organizer-1.3.2.zip) · [SHA-256](./bilibili-favorites-organizer-1.3.2.zip.sha256)
+[下载 v1.3.3](./bilibili-favorites-organizer-1.3.3.zip) · [SHA-256](./bilibili-favorites-organizer-1.3.3.zip.sha256)
 
 下载 ZIP 后解压，在 Chrome / Edge 扩展管理页选择“加载已解压的扩展程序”，选中直接包含 `manifest.json` 的目录。
 

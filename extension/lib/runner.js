@@ -30,11 +30,14 @@ export async function executePlan(client, plan, { onProgress = () => {}, assertF
     state.phase = '核对来源内容';
     for (const [index, source] of plan.sources.entries()) {
       await assertFresh();
-      onProgress({ ...state, detail: `执行前核对来源 ${index + 1}/${plan.sources.length}：“${source.title}”。尚未创建或移动。` });
+      const reading = { kind: 'preflight', source: { id: source.id, title: source.title }, read: 0, expected: source.items.length, step: 'start' };
+      onProgress({ ...state, reading, detail: `执行前核对来源 ${index + 1}/${plan.sources.length}：“${source.title}”。尚未创建或移动。` });
       const actual = await client.resources(source, page => onProgress({ ...state,
+        reading: { ...reading, ...page, step: 'page' },
         detail: `核对“${source.title}”第 ${page.page} 页：${page.read}/${page.expected} 条。尚未创建或移动。` }));
       if (actual.length !== source.items.length) throw new Error(`源收藏夹“${source.title}”数量已变化，请重新读取并核对计划。尚未创建或移动。`);
       if (!matchesSource(actual, source.items)) throw new Error(`源收藏夹“${source.title}”的内容或视频状态已变化，请重新读取源视频并核对计划。尚未创建或移动。`);
+      onProgress({ ...state, reading: { ...reading, read: actual.length, step: 'complete' }, detail: `已核对来源 ${index + 1}/${plan.sources.length}：“${source.title}”。尚未创建或移动。` });
     }
     state.phase = '准备目标收藏夹';
     const folderIds = new Set(folders.map(folder => folder.id));
@@ -66,13 +69,17 @@ export async function executePlan(client, plan, { onProgress = () => {}, assertF
       const source = after.find(folder => folder.id === original.id), moved = movedBySource.get(original.id), retained = retainedBySource.get(original.id) || new Set();
       if (!source) throw new Error('源收藏夹已变化，无法确认视频归属，请核对来源与目标。');
       await assertFresh();
-      const remaining = await client.resources(source);
+      const reading = { kind: 'sources', source, read: 0, expected: source.count, step: 'start' };
+      onProgress({ ...state, reading, detail: `正在检查“${source.title}”的剩余收藏。` });
+      const remaining = await client.resources(source, page => onProgress({ ...state,
+        reading: { ...reading, ...page, step: 'page' }, detail: `检查“${source.title}”第 ${page.page} 页：${page.read}/${page.expected} 条。` }));
       if (remaining.some(item => moved?.has(resourceKey(item)))) throw new Error('部分计划视频仍在原收藏夹，未把复制或部分成功误认为移动完成。请核对来源与目标。');
       const remainingKeys = new Set(remaining.map(resourceKey));
       if ([...retained].some(key => !remainingKeys.has(key))) throw new Error('应保留在来源的重复副本或失效收藏发生变化，请核对来源与目标。');
       // Directory counts may lag a completed write. Only an actual content read
       // proves absence, including folders the directory currently calls empty.
       source.count = remaining.length;
+      onProgress({ ...state, reading: { ...reading, read: remaining.length, step: 'complete' }, detail: `“${source.title}”的移动与保留归属已核对。` });
     }
     state.phase = '完成';
     onProgress({ ...state, detail: `已移动并核对 ${state.verified} 条，移动请求 ${state.moveRequests} 次。${state.retained ? `${state.retained} 条重复收藏记录已保留在原夹。` : ''}${state.skipped ? `${state.skipped} 条失效收藏已跳过并保留在原夹。` : ''}${state.buffer ? `空私密中转夹“${state.buffer.title}”已保留，可自行删除。` : ''}` });

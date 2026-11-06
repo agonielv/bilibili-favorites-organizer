@@ -3,6 +3,7 @@ import { RequestQueue, COOLDOWN_KEY } from './lib/request.js';
 import { BiliClient } from './lib/client.js';
 import { SourceCache } from './lib/source-cache.js';
 import { attachFolderSelection } from './lib/folder-selection.js';
+import { ReadProgress } from './lib/read-progress.js';
 import { executePlan } from './lib/runner.js';
 import { storage, getSession, assertSession, exclusive, prepareTransport } from './lib/platform.js';
 
@@ -15,6 +16,7 @@ let folders = [], selected = new Set(), connectedUid = null, activeId = null, fi
 let snapshot = null, plan = null, taskReadback = null, stage = 'selection', busy = false, activeSession = null, identityDirty = false;
 let keepPreference = true, pages = 0, shown = 0, metadataStale = false, lastTask = null, taskStarted = 0, taskUid = null;
 let announcedPhase = '', lastAnnouncement = 0;
+let readTracker = null, readPhase = null, readState = 'running';
 let folderSelection;
 let lastFolderAnnouncement = 0;
 const client = new BiliClient(queue, async () => {
@@ -32,7 +34,47 @@ function icon(name) {
   const use = document.createElementNS(svg.namespaceURI, 'use'); use.setAttribute('href', '#i-' + name); svg.append(use); return svg;
 }
 function status(message) { $('status').textContent = message; }
+const READ_PHASES = {
+  preview: { label: '生成整理预览', active: '正在读取来源', done: '来源读取完成', note: '只读取所选来源，尚未创建或移动视频。' },
+  preflight: { label: '执行前核对', active: '正在核对来源内容', done: '来源内容已核对', note: '核对通过后才会开始创建和移动视频。' },
+  sources: { label: '执行后检查', active: '正在核对来源归属', done: '来源归属已核对', note: '目标已核对，正在检查原来源与保留副本。' }
+};
+function clearReadProgress() { $('read-progress').hidden = true; $('status').classList.remove('sr-only'); $('execution-panel').classList.remove('is-reading-sources'); readTracker = null; readPhase = null; }
+function beginReadProgress(phase, sources, cached = new Map()) {
+  if (phase === 'preview') $('cooldown-panel').before($('read-progress'));
+  else $('execution-read-slot').append($('read-progress'));
+  readPhase = phase; readState = 'running'; readTracker = new ReadProgress(sources, cached);
+  renderReadProgress();
+  requestAnimationFrame(() => { if (!$('read-progress').hidden) $('read-progress').scrollIntoView({ block: 'nearest' }); });
+}
+function renderReadProgress() {
+  if (!readTracker) return;
+  const view = readTracker.view(), phase = READ_PHASES[readPhase], current = view.current;
+  const panel = $('read-progress'); panel.hidden = false; panel.dataset.state = readState;
+  $('status').classList.toggle('sr-only', readState === 'running');
+  panel.setAttribute('aria-busy', String(readState === 'running'));
+  $('read-stage').textContent = phase.label;
+  $('read-title').textContent = readState === 'stopped' ? `${phase.label}已停止` : readState === 'done' ? phase.done : phase.active;
+  $('read-state').textContent = readState === 'stopped' ? '已停止' : readState === 'done' ? '已完成' : '进行中';
+  $('read-percent').textContent = view.percent;
+  $('read-count').textContent = `已完成 ${view.completed} / ${view.total} 个收藏夹`;
+  $('read-folder').textContent = current?.title || '等待来源';
+  $('read-folder-count').textContent = current ? `${format(current.read)}${current.expected === null ? ' 条 · 总数待确认' : ` / ${format(current.expected)} 条`}` : '等待页数据';
+  $('read-folder-percent').textContent = current?.percent === null || !current ? '等待数据' : `${current.percent}%`;
+  for (const [id, value, label] of [['read-overall', view.percent, `已完成 ${view.completed} / ${view.total} 个收藏夹，${view.percent}%`],
+    ['read-current', current?.percent ?? null, current ? `${current.title}：${$('read-folder-count').textContent}` : '等待来源数据']]) {
+    const bar = $(id);
+    if (value === null) bar.removeAttribute('aria-valuenow'); else bar.setAttribute('aria-valuenow', value);
+    bar.setAttribute('aria-valuetext', label); bar.firstElementChild.style.transform = `scaleX(${(value ?? 0) / 100})`;
+  }
+  $('read-page').textContent = current?.page ? `当前来源 · 已读取 ${current.page} 页` : readState === 'done' ? '所选来源已全部读取' : '正在准备来源数据';
+  $('read-note').textContent = readState === 'stopped' ? '已保留停止时的读取进度，请查看下方错误说明。' : phase.note;
+}
+function stopReadProgress() {
+  if (readTracker && readState === 'running' && !$('read-progress').hidden) { readState = 'stopped'; renderReadProgress(); }
+}
 function report(error) {
+  stopReadProgress();
   const message = error.message || String(error);
   $('error').textContent = message;
   if (error.rateLimited) updateCooldown();
@@ -272,15 +314,18 @@ function setStage(next, focus = true) {
   updateControls();
 }
 function invalidatePlan() {
+  if (!busy) clearReadProgress();
   snapshot = null; plan = null;
   if (stage === 'preview' && !busy) setStage('selection', false);
 }
 function pageProgress(value) {
   pages++; $('scan-count').textContent = pages;
+  if (readPhase === 'preview' && readTracker) { readTracker.update(value); renderReadProgress(); }
   status(`读取“${value.folder.title}”第 ${value.page} 页：${format(value.read)} / ${value.expected ?? '?'} 条。`);
 }
 async function connect() {
   await task(async session => {
+    clearReadProgress();
     const loaded = await client.folders(session.uid), previous = await storage.get('selection:' + session.uid);
     cache.clear(session.uid); snapshot = null; plan = null; lastTask = null; taskReadback = null; metadataStale = false;
     connectedUid = session.uid; folders = loaded;
@@ -299,7 +344,15 @@ async function generate(force = false) {
   let collected;
   await task(async session => {
     if (session.uid !== connectedUid) throw new Error('账号已变化，请重新连接。');
-    collected = await cache.collect(session.uid, folders.filter(folder => selected.has(folder.id)), folder => client.resources(folder, pageProgress));
+    const sources = folders.filter(folder => selected.has(folder.id));
+    const cached = new Map(sources.flatMap(source => {
+      const entry = cache.peek(session.uid, source.id); return entry ? [[source.id, entry.items.length]] : [];
+    }));
+    if (cached.size < sources.length) beginReadProgress('preview', sources, cached); else clearReadProgress();
+    collected = await cache.collect(session.uid, sources, async folder => {
+      const items = await client.resources(folder, pageProgress);
+      readTracker?.update({ source: folder, read: items.length, step: 'complete' }); renderReadProgress(); return items;
+    });
     await assertSession(session);
     if (identityDirty) throw new Error('登录状态已变化，请重新连接。');
     snapshot = collected; plan = buildPlan(snapshot.items, rules, snapshot.sources, folders);
@@ -309,6 +362,7 @@ async function generate(force = false) {
     lastTask = null; taskReadback = null; metadataStale = false; await saveRules(); renderPlan();
     $('execution-panel').hidden = true; $('preview-content').hidden = false;
     setStage('preview'); status(collected.loaded ? '只读预览已生成。尚未创建收藏夹或移动视频。' : '已复用本次读取数据，没有重新扫描。');
+    if (readPhase === 'preview') { readState = 'done'; renderReadProgress(); }
     if (plan.renamedTargets) status($('status').textContent + ` ${plan.renamedTargets} 个目标与已有收藏夹重名，已自动添加编号；请以预览中的名称为准。`);
     if (plan.skippedItems.length) status($('status').textContent + ` ${format(plan.skippedItems.length)} 条失效收藏已跳过，将保留在原收藏夹，不会删除。${plan.itemCount ? '' : '没有可移动的视频。'}`);
     if (plan.missingDates) status($('status').textContent + ` ${plan.missingDates} 条缺少发布时间，已放在所属排序范围末尾。`);
@@ -369,7 +423,14 @@ function renderLocations(state, sources) {
   $('location-note').textContent = state.phase === '完成' ? '目标和来源均已核对。如有空私密中转夹，可前往 B 站自行删除。' : '中断时请同时核对来源、目标及中转夹。不要删除仍含视频的中转夹。';
 }
 function executionProgress(state) {
+  if (state.phase === '任务已停止') stopReadProgress();
+  else if (state.reading) {
+    if (readPhase !== state.reading.kind || !readTracker) beginReadProgress(state.reading.kind, taskReadback.sources);
+    readTracker.update(state.reading); renderReadProgress();
+  } else if (state.phase === '完成' && readPhase === 'sources') { readState = 'done'; renderReadProgress(); }
+  else if (readPhase && !['核对来源内容', '核对来源归属'].includes(state.phase)) clearReadProgress();
   lastTask = state;
+  $('execution-panel').classList.toggle('is-reading-sources', state.phase === '核对来源内容');
   $('execution-panel').hidden = false; $('preview-content').hidden = true;
   $('execution-title').textContent = state.phase; $('page-title').textContent = state.phase;
   $('progress-text').textContent = `${format(state.confirmed)} / ${format(state.total)} 条`;
@@ -432,6 +493,7 @@ function updateCooldown() {
   updateControls();
 }
 function resetIdentity() {
+  clearReadProgress();
   folderSelection.cancel();
   folders = []; selected.clear(); activeId = null; connectedUid = null; snapshot = null; plan = null; taskReadback = null; cache.clear(null);
   $('account-label').textContent = '登录已变化'; $('connect').textContent = '连接并读取列表';
@@ -447,7 +509,7 @@ async function changeScope(mode) {
   for (const folder of scope) { if (mode === 'all' || mode === 'visible') selected.add(folder.id); else selected.delete(folder.id); }
   $('scope-menu').open = false; invalidatePlan(); renderFolders(); await saveSelection();
 }
-function newTask() { if (busy) return; folderSelection.cancel(); lastTask = null; taskReadback = null; plan = null; snapshot = null; $('error').textContent = ''; setStage('selection'); renderFolders(); status('请选择来源并生成新预览。'); }
+function newTask() { if (busy) return; clearReadProgress(); folderSelection.cancel(); lastTask = null; taskReadback = null; plan = null; snapshot = null; $('error').textContent = ''; setStage('selection'); renderFolders(); status('请选择来源并生成新预览。'); }
 function rulesChanged() {
   if (busy) return; folderSelection.cancel(); clearFieldErrors(); invalidatePlan(); syncRules(); renderScope(); void saveRules();
 }
@@ -498,7 +560,7 @@ $('clear-settings').onclick = guarded(async () => {
   if (busy) return;
   const all = await chrome.storage.local.get(null);
   await chrome.storage.local.remove(Object.keys(all).filter(key => key === 'rules' || key.startsWith('selection:')));
-  applyRules(DEFAULT_RULES); selected.clear(); cache.clear(connectedUid); snapshot = null; plan = null; lastTask = null; taskReadback = null;
+  clearReadProgress(); applyRules(DEFAULT_RULES); selected.clear(); cache.clear(connectedUid); snapshot = null; plan = null; lastTask = null; taskReadback = null;
   setStage('selection', false); renderFolders(); status('已清除保存设置，接口冷却状态保留。');
 });
 window.addEventListener('beforeunload', event => { if (busy) { event.preventDefault(); event.returnValue = ''; } });
