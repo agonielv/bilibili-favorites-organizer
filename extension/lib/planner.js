@@ -32,7 +32,7 @@ export function compareVideos(time) {
       collator.compare(a.title, b.title) || collator.compare(a.id, b.id) || collator.compare(a.sourceId, b.sourceId);
   };
 }
-export function buildPlan(items, inputRules, sourceFolders = []) {
+export function buildPlan(items, inputRules, sourceFolders = [], existingFolders = []) {
   const rules = validateRules(inputRules);
   if (!items.length) throw new Error('所选收藏夹没有可移动的视频。');
   const sources = new Map(sourceFolders.map(folder => [String(folder.id), { id: String(folder.id), title: folder.title, items: [] }]));
@@ -79,9 +79,19 @@ export function buildPlan(items, inputRules, sourceFolders = []) {
     }
   }
   if (current.length) chunks.push(current);
+  const names = new Set(existingFolders.map(folder => String(folder.title).trim().toLowerCase()));
+  let renamedTargets = 0;
+  const targets = chunks.map((items, index) => {
+    const requested = rules.base + (chunks.length > 1 ? `-${index + 1}` : '');
+    let name = requested, suffix = 2;
+    while (names.has(name.toLowerCase())) name = `${requested}-${suffix++}`;
+    if (name !== requested) renamedTargets++;
+    names.add(name.toLowerCase());
+    return { name, items };
+  });
   return { rules, sources: [...sources.values()], skippedItems, retainedItems, recordCount: items.length + skippedItems.length,
     itemCount: uniqueItems.length, uploaderCount: grouped.size, missingDates: uniqueItems.filter(i => !i.publishedAt).length,
-    chunks: chunks.map((items, index) => ({ name: rules.base + (chunks.length > 1 ? `-${index + 1}` : ''), items })) };
+    renamedTargets, chunks: targets };
 }
 // Never merge nonadjacent source segments just to obtain a larger batch.
 export function moveOperations(items, maxBatch = 1) {

@@ -80,7 +80,7 @@ export class BiliClient {
       } catch (error) {
         last = error;
         // Only explicit rejections known to need alternate form fields may retry.
-        if (!error.rejected || ![-112, -400, -403].includes(error.code)) throw error;
+        if (!error.rejected || ![-112, -400].includes(error.code)) throw error;
       }
     }
     throw last;

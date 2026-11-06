@@ -21,8 +21,8 @@ export function shouldStage(items) {
 }
 class UnsupportedBatch extends Error {}
 export class TransferEngine {
-  constructor(client, state, { assertFresh, onProgress, reservedNames }) {
-    Object.assign(this, { client, state, assertFresh, onProgress, reservedNames });
+  constructor(client, state, { assertFresh, onProgress, reservedNames, reservedIds }) {
+    Object.assign(this, { client, state, assertFresh, onProgress, reservedNames, reservedIds });
     this.orderBulk = true; this.sizeIndex = 0; this.membershipCap = 100; this.orientation = 'write';
     this.buffer = null; this.looseIndex = 0;
   }
@@ -47,7 +47,9 @@ export class TransferEngine {
     while (this.reservedNames.has(name.toLowerCase())) name += 'x';
     this.notify('准备私密中转夹', '需要中转或校正排序；仅处理本次计划内的视频。');
     await this.assertFresh();
-    this.buffer = await this.client.create(name, 'private');
+    const created = await this.client.create(name, 'private');
+    if (this.reservedIds.has(created.id)) throw new Error('中转夹创建接口返回了已有收藏夹 ID，已停止，不会改动该收藏夹。');
+    this.reservedIds.add(created.id); this.buffer = created;
     this.state.buffer = { ...this.buffer };
     this.reservedNames.add(name.toLowerCase());
     return this.buffer;
@@ -181,6 +183,8 @@ export class TransferEngine {
     if (!sameOrder(await this.read(target), desired)) throw new Error('逐条校正后顺序仍不一致，已停止，不会报告成功。');
   }
   async process(chunk, target) {
+    const initial = await this.head(target);
+    if (initial.count !== 0 || initial.items.length) throw new Error('新目标收藏夹已有内容，已停止；不会移动或覆盖计划外视频。');
     const completed = this.state.verified;
     let items = chunk.items;
     if (this.orderBulk && this.membershipCap > 1 && shouldStage(items)) items = await this.collect(chunk);

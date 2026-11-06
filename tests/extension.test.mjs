@@ -127,6 +127,11 @@ test('creation compatibility only retries explicit rejections and honors public/
   const t = transport(call => {assert.equal(new URLSearchParams(call.init.body).get('privacy'),'0'); return ++n < 2 ? response({}, {code:-112}) : response({id:20});});
   assert.equal((await t.client.create('新','public')).id,'20'); assert.equal(t.calls.length,2);
 });
+test('API creation permission denial stops after one request instead of retrying other forms', async () => {
+  const t = transport(() => response({}, { code: -403, message: '访问权限不足' }));
+  await assert.rejects(t.client.create('新', 'private'), error => error.code === -403);
+  assert.equal(t.calls.length, 1);
+});
 test('runner prepares targets before moves and verifies default order', async () => {
   const items=[item(1),item(2),item(3),item(4)], client=new MemoryClient(items);
   const result=await executePlan(client,buildPlan(items,{capacity:2,keep:false}));

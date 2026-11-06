@@ -9,7 +9,7 @@ for(const pageSize of [100,20]) for(const mode of ['连续来源','六源交错'
   const result=await executePlan(client,plan);
   for(let i=0;i<plan.chunks.length;i++)assert.deepEqual(client.data.get(result.created[i].id).items.map(i=>i.id),plan.chunks[i].items.map(i=>i.id));
   assert.equal(result.verified,n);
-  const singleRequests=1+plan.sources.reduce((sum,source)=>sum+Math.ceil(source.items.length/20),0)+plan.chunks.length+n+plan.chunks.reduce((s,c)=>s+Math.ceil(c.items.length/20),0)+1;
+  const singleRequests=1+plan.sources.reduce((sum,source)=>sum+Math.max(1,Math.ceil(source.items.length/20)),0)+plan.chunks.length*2+n+plan.chunks.reduce((s,c)=>s+Math.ceil(c.items.length/20),0)+1+plan.sources.length;
   assert(client.requests<singleRequests/3,'Batching must materially reduce requests including verification');
   output.push({scenario:mode,acceptedPageSize:pageSize,videos:n,baselineMoveRequests:n,moveRequests:result.moveRequests,batchRequests:result.batchRequests,
     baselineExecutionRequests:singleRequests,executionRequests:client.requests,requestReduction:(singleRequests/client.requests).toFixed(2)+'x',

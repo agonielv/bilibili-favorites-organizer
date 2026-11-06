@@ -141,6 +141,15 @@ try {
  assert.equal(folders.get('20').privacy,'0');assert.deepEqual(folders.get('20').medias.map(m=>m.id),[...staged].sort((a,b)=>b.pubtime-a.pubtime).map(m=>m.id));
  assert.match(await page.locator('#execution-message').innerText(),/移动请求/);assert.match(await page.locator('#execution-message').innerText(),/中转夹/);
  backendDisplayOrder=false;
+ // A second task should show a safe name in preview rather than fail after confirmation.
+ folders.get('10').medias.push(initial[0]);
+ await page.locator('#connect').click();await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('已读取 4'));
+ await page.locator('#generate').click();await page.locator('#preview').waitFor({state:'visible'});
+ assert.equal(await page.locator('.plan-name h3').innerText(),'UP聚合-2');
+ assert.match(await page.locator('#status').innerText(),/重名.*自动添加编号/);
+ const collisionWrites=writes.length;
+ await page.locator('#review').click();assert.match(await page.locator('#confirm-rules').innerText(),/UP聚合-2/);await page.locator('#cancel').click();
+ assert.equal(writes.length,collisionWrites,'Resolving a name collision in preview must never write');
  // Account switch invalidates cached state and never moves.
  session={uid:'456',csrf:'different-test-only'};await page.evaluate(()=>window.testCookieChanged({cookie:{domain:'.bilibili.com',name:'DedeUserID'}}));assert(await page.locator('#review').isDisabled());assert.match(await page.locator('#account-label').innerText(),/变化/);
  session={uid:'123',csrf:'mock-only'};resetData();await page.locator('#connect').click();await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('已读取 2') || document.querySelector('#error').textContent.length > 0);

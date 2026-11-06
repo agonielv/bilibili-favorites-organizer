@@ -1,6 +1,6 @@
 # Bilibili 收藏夹整理
 
-![Version](https://img.shields.io/badge/Version-1.3.1-0069D2)
+![Version](https://img.shields.io/badge/Version-1.3.2-0069D2)
 ![Chrome](https://img.shields.io/badge/Chrome-116%2B-4285F4)
 ![Edge](https://img.shields.io/badge/Edge-116%2B-0078D7)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-34A853)
@@ -123,7 +123,7 @@
 
 ### 本地安装（当前方式）
 
-在 GitHub 当前分支点击 **Code → Download ZIP** 获取源码并解压。也可以在本机通过 `npm run pack` 生成 `bilibili-favorites-organizer-1.3.1.zip` 后解压安装。
+在 GitHub 当前分支点击 **Code → Download ZIP** 获取源码并解压。也可以在本机通过 `npm run pack` 生成 `bilibili-favorites-organizer-1.3.2.zip` 后解压安装。
 
 - 使用仓库源码：选择解压后的 **`extension/` 目录**。
 - 使用打包产物：选择解压后**直接包含 `manifest.json` 的目录**。
@@ -175,13 +175,15 @@
 
 | 来源情况 | 接口接受的页大小 | 逐条基线执行请求 | 优化后的执行请求 | 其中移动请求 |
 | --- | ---: | ---: | ---: | ---: |
-| 连续来源 | 100 | 6608 | 252 | 62 |
-| 六源交错 | 100 | 6608 | 473 | 136（含中转） |
-| 连续来源 | 20 | 6608 | 732 | 62 |
-| 六源交错 | 20 | 6608 | 1193 | 136（含中转） |
+| 连续来源 | 100 | 6620 | 264 | 62 |
+| 六源交错 | 100 | 6620 | 485 | 136（含中转） |
+| 连续来源 | 20 | 6620 | 744 | 62 |
+| 六源交错 | 20 | 6620 | 1205 | 136（含中转） |
 
 > [!NOTE]
 > 这是模拟接口支持批量时的**请求量比较**，不是 B 站真实耗时或吞吐承诺。网络、接口限制、校正和降级都会影响实际速度；不支持批量时仍可能耗时较长。
+
+最新自查覆盖 97 项回归检查，其中包含 2,000 组重复 / 失效 / 排序 / 批量异常组合，后续 `npm test` 会持续运行这些检查。详见 [整理可靠性自查](docs/reliability-audit.md)。
 
 使用 `npm run benchmark` 可复现。详见 [性能分析](./docs/extension-performance.md) 和 [模拟数据](./docs/transfer-benchmark.json)。
 
@@ -219,7 +221,7 @@ HTTP 412 / 429 或识别到接口风控时，扩展立即停止，至少冷却 6
 <details>
 <summary>哪些收藏暂时不能一起处理？</summary>
 
-本版仅处理视频。失效视频仍计入读取总数，随后跳过并保留在原夹，其余视频正常整理；预览与确认会列出失效数量。没有自动清理或删除失效收藏的功能。发现非视频资源或目标名称已存在时，会停止并说明；不自动合并或删除收藏夹。
+本版仅处理视频。失效视频仍计入读取总数，随后跳过并保留在原夹，其余视频正常整理；预览与确认会列出失效数量。没有自动清理或删除失效收藏的功能。发现非视频资源时，会停止并说明；预览会为与已有收藏夹重名的目标添加编号，确认时展示实际名称，不自动合并或删除已有收藏夹。若确认后又出现新的同名目标，执行前会停止以避免混入内容。
 
 同一视频出现在多个所选源收藏夹时，按左侧列表顺序只移动第一份有效副本，其余副本留在各自原收藏夹。分组、容量和移动进度按实际移动的唯一视频计算，预览与执行确认会说明重复记录的保留数量，执行后按来源核对移动与保留归属。
 
@@ -262,9 +264,9 @@ npm run benchmark
 npm run pack
 ```
 
-打包产物位于 `dist/bilibili-favorites-organizer-1.3.1.zip`，同时保存到 [`packages/`](packages/README.md)，附带 SHA-256。每次成品包随源码一起更新到 GitHub。
+打包产物位于 `dist/bilibili-favorites-organizer-1.3.2.zip`，同时保存到 [`packages/`](packages/README.md)，附带 SHA-256。每次成品包随源码一起更新到 GitHub。
 
-[下载最新成品包 v1.3.1](packages/bilibili-favorites-organizer-1.3.1.zip)
+[下载最新成品包 v1.3.2](packages/bilibili-favorites-organizer-1.3.2.zip)
 
 项目已安装 [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 到 `.agents/skills/ui-ux-pro-max/`，用于后续界面与交互工作；技能不进入扩展成品包。
 

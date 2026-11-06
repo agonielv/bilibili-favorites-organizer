@@ -302,13 +302,14 @@ async function generate(force = false) {
     collected = await cache.collect(session.uid, folders.filter(folder => selected.has(folder.id)), folder => client.resources(folder, pageProgress));
     await assertSession(session);
     if (identityDirty) throw new Error('登录状态已变化，请重新连接。');
-    snapshot = collected; plan = buildPlan(snapshot.items, rules, snapshot.sources);
+    snapshot = collected; plan = buildPlan(snapshot.items, rules, snapshot.sources, folders);
     const counts = new Map();
     for (const item of collected.items) counts.set(item.sourceId, (counts.get(item.sourceId) || 0) + 1);
     for (const folder of folders.filter(folder => selected.has(folder.id))) folder.count = counts.get(folder.id) || 0;
     lastTask = null; taskReadback = null; metadataStale = false; await saveRules(); renderPlan();
     $('execution-panel').hidden = true; $('preview-content').hidden = false;
     setStage('preview'); status(collected.loaded ? '只读预览已生成。尚未创建收藏夹或移动视频。' : '已复用本次读取数据，没有重新扫描。');
+    if (plan.renamedTargets) status($('status').textContent + ` ${plan.renamedTargets} 个目标与已有收藏夹重名，已自动添加编号；请以预览中的名称为准。`);
     if (plan.skippedItems.length) status($('status').textContent + ` ${format(plan.skippedItems.length)} 条失效收藏已跳过，将保留在原收藏夹，不会删除。${plan.itemCount ? '' : '没有可移动的视频。'}`);
     if (plan.missingDates) status($('status').textContent + ` ${plan.missingDates} 条缺少发布时间，已放在所属排序范围末尾。`);
   });

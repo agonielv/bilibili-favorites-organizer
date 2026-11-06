@@ -126,7 +126,8 @@ test('a copy-like response is still rejected when the same video is intentionall
 });
 test('risk during verification halts after a successful write and reports the pending batch',async()=>{
   const items=dataset(12),client=new MemoryClient(items);
-  client.inspect=async()=>{throw Object.assign(new Error('限流'),{rateLimited:true})};
+  const inspect=client.inspect.bind(client);
+  client.inspect=async folder=>{if(client.moves)throw Object.assign(new Error('限流'),{rateLimited:true});return inspect(folder)};
   await assert.rejects(executePlan(client,buildPlan(items,{})),e=>e.cause.rateLimited&&e.state.confirmed===2&&e.state.pending===2);
   assert.equal(client.events.at(-1).type,'move');assert.equal(client.moves,1);
 });
