@@ -270,6 +270,7 @@ npm run pack
 [下载最新成品包 v1.3.4](packages/bilibili-favorites-organizer-1.3.4.zip)
 
 项目已安装 [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 到 `.agents/skills/ui-ux-pro-max/`，用于后续界面与交互工作；技能不进入扩展成品包。
+另已安装 Superpowers、Matt Pocock Skills、Karpathy Guidelines 和 Taste Skill，共新增 44 个正式开发技能。来源、版本、使用方式及校验说明见 [已安装技能](docs/installed-skills.md)。
 
 <details>
 <summary>浏览器模拟集成检查</summary>

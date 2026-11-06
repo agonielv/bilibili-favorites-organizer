@@ -1,0 +1,349 @@
+{
+  "format_version": 1,
+  "installed_date": "2026-11-06",
+  "scope": "project",
+  "method": "editable skill copies discovered through .agents/skills; not client plugin registration",
+  "sources": [
+    {
+      "repository": "https://github.com/obra/superpowers",
+      "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+      "version": "7.0.2",
+      "selection": "all bundled skills",
+      "skills": [
+        {
+          "name": "brainstorming",
+          "source_path": "skills/brainstorming",
+          "installed_path": ".agents/skills/brainstorming",
+          "file_count": 8,
+          "content_sha256": "e4bb93254e14486d0a543ff86ca65b4531a7f7cb406fd60fc96dc481952ec6a2"
+        },
+        {
+          "name": "diagnosing-superpowers",
+          "source_path": "skills/diagnosing-superpowers",
+          "installed_path": ".agents/skills/diagnosing-superpowers",
+          "file_count": 20,
+          "content_sha256": "41d5660b88d14facf891305fc9d0edf6ceca4ce642679d449b7b03d64ad3471c"
+        },
+        {
+          "name": "dispatching-parallel-agents",
+          "source_path": "skills/dispatching-parallel-agents",
+          "installed_path": ".agents/skills/dispatching-parallel-agents",
+          "file_count": 1,
+          "content_sha256": "1acb899b23c2bdb5af5961e7b97ba43fb2a5593822db755747ef3d5db9f825a4"
+        },
+        {
+          "name": "executing-plans",
+          "source_path": "skills/executing-plans",
+          "installed_path": ".agents/skills/executing-plans",
+          "file_count": 3,
+          "content_sha256": "165ceffeceac8d32e818120cd2f7ab4986d255433ed36ea5d6da56e7cc004989"
+        },
+        {
+          "name": "finishing-a-development-branch",
+          "source_path": "skills/finishing-a-development-branch",
+          "installed_path": ".agents/skills/finishing-a-development-branch",
+          "file_count": 1,
+          "content_sha256": "1da9182001d887c0fb8c62aeee35c8f65b438b32a30b79104baedcca9e0ebef6"
+        },
+        {
+          "name": "receiving-code-review",
+          "source_path": "skills/receiving-code-review",
+          "installed_path": ".agents/skills/receiving-code-review",
+          "file_count": 1,
+          "content_sha256": "e5dd23be2d93f751c8b28d647c4b139754aedfe75648cd8e1100e47f5da0c3c5"
+        },
+        {
+          "name": "requesting-code-review",
+          "source_path": "skills/requesting-code-review",
+          "installed_path": ".agents/skills/requesting-code-review",
+          "file_count": 2,
+          "content_sha256": "da21da5cdf7894945c3990bdea317b1be4e2cf553831d22027558ca45a6cc45b"
+        },
+        {
+          "name": "subagent-driven-development",
+          "source_path": "skills/subagent-driven-development",
+          "installed_path": ".agents/skills/subagent-driven-development",
+          "file_count": 15,
+          "content_sha256": "34eccdc358aa26f8671c71af54ad729ab709a2c41d4c9391e7903d1da3542d65"
+        },
+        {
+          "name": "systematic-debugging",
+          "source_path": "skills/systematic-debugging",
+          "installed_path": ".agents/skills/systematic-debugging",
+          "file_count": 6,
+          "content_sha256": "0c8a24ab45376f6fccf5162380a8f782f2bbca7dad8e7e0ddcae19c8d7259933"
+        },
+        {
+          "name": "test-driven-development",
+          "source_path": "skills/test-driven-development",
+          "installed_path": ".agents/skills/test-driven-development",
+          "file_count": 2,
+          "content_sha256": "8e8772822d25e4dfc9295cf4526c6251a10458c7417ac50c4b42e5d9fc91e0b0"
+        },
+        {
+          "name": "using-git-worktrees",
+          "source_path": "skills/using-git-worktrees",
+          "installed_path": ".agents/skills/using-git-worktrees",
+          "file_count": 1,
+          "content_sha256": "98dc7da4ead1fe3c523c7ac314082f1f85114ad5e6ec39d4426b4a7f76ed9d0c"
+        },
+        {
+          "name": "using-superpowers",
+          "source_path": "skills/using-superpowers",
+          "installed_path": ".agents/skills/using-superpowers",
+          "file_count": 8,
+          "content_sha256": "bcdbc241f63b69c68e66b9168012dc703ef955ac381a955a72aa2c0f256495bc"
+        },
+        {
+          "name": "verification-before-completion",
+          "source_path": "skills/verification-before-completion",
+          "installed_path": ".agents/skills/verification-before-completion",
+          "file_count": 1,
+          "content_sha256": "d8a53168f152b6163bd3447f7d4c20b6b4cddf6bd907f9aa5856b514c032db0e"
+        },
+        {
+          "name": "writing-plans",
+          "source_path": "skills/writing-plans",
+          "installed_path": ".agents/skills/writing-plans",
+          "file_count": 1,
+          "content_sha256": "b96f84fcdd4fc87bf3264e960e7a423bf6d3612e2b3355b4d6cd5f61ef7fe45d"
+        },
+        {
+          "name": "writing-skills",
+          "source_path": "skills/writing-skills",
+          "installed_path": ".agents/skills/writing-skills",
+          "file_count": 10,
+          "content_sha256": "9ca4cdbef07abe834a36aeed5434f0afed6d3679dab61041e0ba9cf9a99ea425"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/mattpocock/skills",
+      "commit": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "version": "1.3.2",
+      "selection": "published plugin skills",
+      "skills": [
+        {
+          "name": "ask-matt",
+          "source_path": "skills/engineering/ask-matt",
+          "installed_path": ".agents/skills/ask-matt",
+          "file_count": 3,
+          "content_sha256": "70c59ebfe4f83b849b84ef5a4507bd29b45e8ec7a6b7fa1ed770d68d00334f0c"
+        },
+        {
+          "name": "code-review",
+          "source_path": "skills/engineering/code-review",
+          "installed_path": ".agents/skills/code-review",
+          "file_count": 2,
+          "content_sha256": "cd5bdf2afe1680d10150ae58abacbc32e7a11d034be76c7ef6fad58546ce85e3"
+        },
+        {
+          "name": "codebase-design",
+          "source_path": "skills/engineering/codebase-design",
+          "installed_path": ".agents/skills/codebase-design",
+          "file_count": 4,
+          "content_sha256": "61f4936a45f334e894fe4c7e9b1bbaf509c1b451c2f8bddf91e563ac6ae82422"
+        },
+        {
+          "name": "diagnosing-bugs",
+          "source_path": "skills/engineering/diagnosing-bugs",
+          "installed_path": ".agents/skills/diagnosing-bugs",
+          "file_count": 3,
+          "content_sha256": "29faf0d352422aa58beb0ce4666a49bdfdd5d2cc065c9dfe9be7b7e89fbdf584"
+        },
+        {
+          "name": "domain-modeling",
+          "source_path": "skills/engineering/domain-modeling",
+          "installed_path": ".agents/skills/domain-modeling",
+          "file_count": 4,
+          "content_sha256": "18a9314d338b8135e4108d1d31d2fd57ad289cf8bf31d2acd6a6f3053ac22a38"
+        },
+        {
+          "name": "grill-with-docs",
+          "source_path": "skills/engineering/grill-with-docs",
+          "installed_path": ".agents/skills/grill-with-docs",
+          "file_count": 2,
+          "content_sha256": "2dff19547f0f72000f8b88868e21b7d76c27cf5c7ececc6edf4042bbe06157ac"
+        },
+        {
+          "name": "implement",
+          "source_path": "skills/engineering/implement",
+          "installed_path": ".agents/skills/implement",
+          "file_count": 2,
+          "content_sha256": "72f446ef5b35d3df73c21b574ba2ae50ab3d02fc5d4da44b80f27ce13e7dc18d"
+        },
+        {
+          "name": "implement-spec",
+          "source_path": "skills/engineering/implement-spec",
+          "installed_path": ".agents/skills/implement-spec",
+          "file_count": 2,
+          "content_sha256": "c50119e1da19b7e62161d96e00bc1e39e661ac48e522ce4904c362bccc90e72e"
+        },
+        {
+          "name": "improve-codebase-architecture",
+          "source_path": "skills/engineering/improve-codebase-architecture",
+          "installed_path": ".agents/skills/improve-codebase-architecture",
+          "file_count": 3,
+          "content_sha256": "8d02654da91dea62336b390b4c77031629840aec40d604aa6aa08e78df98d7ea"
+        },
+        {
+          "name": "pr",
+          "source_path": "skills/engineering/pr",
+          "installed_path": ".agents/skills/pr",
+          "file_count": 3,
+          "content_sha256": "fd6364a4c6714b4978b23abcbb170eaddeb99da87f2efee1f6e9baf9dfc2a446"
+        },
+        {
+          "name": "prototype",
+          "source_path": "skills/engineering/prototype",
+          "installed_path": ".agents/skills/prototype",
+          "file_count": 4,
+          "content_sha256": "c4efd5e0f1c302b6225be83e8e42abdb05e13fde900484e4e2240e90b4e83eb6"
+        },
+        {
+          "name": "research",
+          "source_path": "skills/engineering/research",
+          "installed_path": ".agents/skills/research",
+          "file_count": 2,
+          "content_sha256": "f2d6425b15cf3100d5c3eb4305a8e817174b8e5fa1fde6e06ad4b61321c32a60"
+        },
+        {
+          "name": "retro",
+          "source_path": "skills/engineering/retro",
+          "installed_path": ".agents/skills/retro",
+          "file_count": 2,
+          "content_sha256": "09c4f9fe72fc5bc8e486a2bbb32dd785ca6264c56a53dd1bf9a334af72586efd"
+        },
+        {
+          "name": "setup-matt-pocock-skills",
+          "source_path": "skills/engineering/setup-matt-pocock-skills",
+          "installed_path": ".agents/skills/setup-matt-pocock-skills",
+          "file_count": 7,
+          "content_sha256": "d1d1b40f71fcb294d27a1b00297d1d25bcff3bc1e8759794a4af906b243d8e31"
+        },
+        {
+          "name": "tdd",
+          "source_path": "skills/engineering/tdd",
+          "installed_path": ".agents/skills/tdd",
+          "file_count": 4,
+          "content_sha256": "aaed5857190bc8088332725c9c8deecf560744f6f7ef0bdfccf4bdf3fe678c16"
+        },
+        {
+          "name": "to-spec",
+          "source_path": "skills/engineering/to-spec",
+          "installed_path": ".agents/skills/to-spec",
+          "file_count": 2,
+          "content_sha256": "f525dab8b9bd3961aa4813d8568ef6184f6e24aad5a020e129165ca6c220f836"
+        },
+        {
+          "name": "to-tickets",
+          "source_path": "skills/engineering/to-tickets",
+          "installed_path": ".agents/skills/to-tickets",
+          "file_count": 2,
+          "content_sha256": "6eccfac132d92b949821d154679adc7f597bfc3e8c929f3c03786b92f91b961f"
+        },
+        {
+          "name": "triage",
+          "source_path": "skills/engineering/triage",
+          "installed_path": ".agents/skills/triage",
+          "file_count": 4,
+          "content_sha256": "9c6b69d13831d354c1a62eaa047e3160617f9b035d411555268a343b51e96a0c"
+        },
+        {
+          "name": "wayfinder",
+          "source_path": "skills/engineering/wayfinder",
+          "installed_path": ".agents/skills/wayfinder",
+          "file_count": 2,
+          "content_sha256": "62a0ab7262d40119da048328a71aeadaeaa21a4049ee9268d14500921bb6e257"
+        },
+        {
+          "name": "wizard",
+          "source_path": "skills/engineering/wizard",
+          "installed_path": ".agents/skills/wizard",
+          "file_count": 3,
+          "content_sha256": "8fd93e38124bf81ad439231ba8af833b462ca9719c62373c87f25b06f6be776e"
+        },
+        {
+          "name": "grill-me",
+          "source_path": "skills/productivity/grill-me",
+          "installed_path": ".agents/skills/grill-me",
+          "file_count": 2,
+          "content_sha256": "14c292fe16c0aed833cbbabb0983515c8d665fb6061d9755b13dba870363323b"
+        },
+        {
+          "name": "grilling",
+          "source_path": "skills/productivity/grilling",
+          "installed_path": ".agents/skills/grilling",
+          "file_count": 2,
+          "content_sha256": "27f71f106a7062691b2982d4f847304a62930ebed8b50734f4d4fd498d60afa8"
+        },
+        {
+          "name": "handoff",
+          "source_path": "skills/productivity/handoff",
+          "installed_path": ".agents/skills/handoff",
+          "file_count": 2,
+          "content_sha256": "77c2607c751b7c522e0208ab113ba4949f8267610d6061323c7ccd3ace21d7da"
+        },
+        {
+          "name": "teach",
+          "source_path": "skills/productivity/teach",
+          "installed_path": ".agents/skills/teach",
+          "file_count": 6,
+          "content_sha256": "9aaf696786348313963552e446415c67fdd8129276b61f02be6dcedb208cd381"
+        },
+        {
+          "name": "to-questionnaire",
+          "source_path": "skills/productivity/to-questionnaire",
+          "installed_path": ".agents/skills/to-questionnaire",
+          "file_count": 2,
+          "content_sha256": "560491db9f48174ca9f7b5dd1444bc9c3cb7ac2d9e3e673e48289ef3221f164e"
+        },
+        {
+          "name": "wait-what",
+          "source_path": "skills/productivity/wait-what",
+          "installed_path": ".agents/skills/wait-what",
+          "file_count": 2,
+          "content_sha256": "7eb4f8dd850b68708fb62fe2d7486b633246bd388e745f6cb6744d47b7a73b2c"
+        },
+        {
+          "name": "writing-for-agents",
+          "source_path": "skills/productivity/writing-for-agents",
+          "installed_path": ".agents/skills/writing-for-agents",
+          "file_count": 3,
+          "content_sha256": "dc53f07d1f662137317789b9b5d74cfcc26dbcfc15038a7faf676c844d8638e8"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/multica-ai/andrej-karpathy-skills",
+      "commit": "2c606141936f1eeef17fa3043a72095b4765b9c2",
+      "version": "1.0.0",
+      "selection": "all bundled skills",
+      "skills": [
+        {
+          "name": "karpathy-guidelines",
+          "source_path": "skills/karpathy-guidelines",
+          "installed_path": ".agents/skills/karpathy-guidelines",
+          "file_count": 1,
+          "content_sha256": "5e8a1677df986d47abaf3d42f1ce0c7427ea030f50370c52baf9ba1e2c7c3db9"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/Leonxlnx/taste-skill",
+      "commit": "9b4bf937a1f69348126959c15d2f99a73e65699b",
+      "version": "2.5.0",
+      "selection": "all bundled skills",
+      "skills": [
+        {
+          "name": "design-taste-frontend",
+          "source_path": "skills/taste-skill",
+          "installed_path": ".agents/skills/design-taste-frontend",
+          "file_count": 1617,
+          "content_sha256": "52539e5a0d3d8315cdbee3225a31ce633ffc103fe64e9b8c7444ca576158e3ae"
+        }
+      ]
+    }
+  ],
+  "content_hash_format": "SHA-256 of relative POSIX path + NUL + file bytes + NUL; paths sorted lexicographically"
+}
