@@ -1,0 +1,284 @@
+{
+  "kind": "deterministic mock; not live Bilibili; execution preflight included; preview scan and network latency excluded",
+  "intervalMs": 1200,
+  "results": [
+    {
+      "scenario": "healthy",
+      "version": "baseline",
+      "videos": 6000,
+      "sources": 1,
+      "pageSize": 100,
+      "moveRequests": 62,
+      "executionRequests": 259,
+      "targetFirstBatchSizes": [
+        2,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "healthy",
+      "version": "current",
+      "videos": 6000,
+      "sources": 1,
+      "pageSize": 100,
+      "moveRequests": 62,
+      "executionRequests": 259,
+      "targetFirstBatchSizes": [
+        2,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "transient-partial",
+      "version": "baseline",
+      "videos": 6000,
+      "sources": 1,
+      "pageSize": 100,
+      "moveRequests": 6007,
+      "executionRequests": 6225,
+      "targetFirstBatchSizes": [
+        2,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "transient-partial",
+      "version": "current",
+      "videos": 6000,
+      "sources": 1,
+      "pageSize": 100,
+      "moveRequests": 117,
+      "executionRequests": 393,
+      "targetFirstBatchSizes": [
+        2,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "transient-order",
+      "version": "baseline",
+      "videos": 6000,
+      "sources": 1,
+      "pageSize": 100,
+      "moveRequests": 6010,
+      "executionRequests": 6180,
+      "targetFirstBatchSizes": [
+        2,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "transient-order",
+      "version": "current",
+      "videos": 6000,
+      "sources": 1,
+      "pageSize": 100,
+      "moveRequests": 193,
+      "executionRequests": 424,
+      "targetFirstBatchSizes": [
+        2,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "staging-partial",
+      "version": "baseline",
+      "videos": 6000,
+      "sources": 3,
+      "pageSize": 100,
+      "moveRequests": 7000,
+      "executionRequests": 7183,
+      "targetFirstBatchSizes": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "staging-partial",
+      "version": "current",
+      "videos": 6000,
+      "sources": 3,
+      "pageSize": 100,
+      "moveRequests": 1116,
+      "executionRequests": 1473,
+      "targetFirstBatchSizes": [
+        1,
+        2,
+        100,
+        100,
+        100,
+        100
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "single-only",
+      "version": "baseline",
+      "videos": 6000,
+      "sources": 1,
+      "pageSize": 100,
+      "moveRequests": 6003,
+      "executionRequests": 6211,
+      "targetFirstBatchSizes": [
+        2,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "single-only",
+      "version": "current",
+      "videos": 6000,
+      "sources": 1,
+      "pageSize": 100,
+      "moveRequests": 6003,
+      "executionRequests": 6211,
+      "targetFirstBatchSizes": [
+        2,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "arbitrary",
+      "version": "baseline",
+      "videos": 6000,
+      "sources": 1,
+      "pageSize": 100,
+      "moveRequests": 6004,
+      "executionRequests": 6161,
+      "targetFirstBatchSizes": [
+        2,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "arbitrary",
+      "version": "current",
+      "videos": 6000,
+      "sources": 1,
+      "pageSize": 100,
+      "moveRequests": 6031,
+      "executionRequests": 6278,
+      "targetFirstBatchSizes": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "partial-always",
+      "version": "baseline",
+      "videos": 6000,
+      "sources": 3,
+      "pageSize": 100,
+      "moveRequests": 7000,
+      "executionRequests": 7183,
+      "targetFirstBatchSizes": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "partial-always",
+      "version": "current",
+      "videos": 6000,
+      "sources": 3,
+      "pageSize": 100,
+      "moveRequests": 6012,
+      "executionRequests": 6324,
+      "targetFirstBatchSizes": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "late-corruption",
+      "version": "baseline",
+      "videos": 1000,
+      "sources": 1,
+      "pageSize": 20,
+      "moveRequests": 1024,
+      "executionRequests": 1357,
+      "targetFirstBatchSizes": [
+        2
+      ],
+      "exactOrderAndMembershipVerified": true
+    },
+    {
+      "scenario": "late-corruption",
+      "version": "current",
+      "videos": 1000,
+      "sources": 1,
+      "pageSize": 20,
+      "moveRequests": 42,
+      "executionRequests": 318,
+      "targetFirstBatchSizes": [
+        2
+      ],
+      "exactOrderAndMembershipVerified": true
+    }
+  ]
+}

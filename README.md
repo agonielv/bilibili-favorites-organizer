@@ -1,6 +1,6 @@
 # Bilibili 收藏夹整理
 
-![Version](https://img.shields.io/badge/Version-1.3.4-0069D2)
+![Version](https://img.shields.io/badge/Version-1.4.0-0069D2)
 ![Chrome](https://img.shields.io/badge/Chrome-116%2B-4285F4)
 ![Edge](https://img.shields.io/badge/Edge-116%2B-0078D7)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-34A853)
@@ -124,7 +124,7 @@
 
 ### 本地安装（当前方式）
 
-在 GitHub 当前分支点击 **Code → Download ZIP** 获取源码并解压。也可以在本机通过 `npm run pack` 生成 `bilibili-favorites-organizer-1.3.4.zip` 后解压安装。
+在 GitHub 当前分支点击 **Code → Download ZIP** 获取源码并解压。也可以在本机通过 `npm run pack` 生成 `bilibili-favorites-organizer-1.4.0.zip` 后解压安装。
 
 - 使用仓库源码：选择解压后的 **`extension/` 目录**。
 - 使用打包产物：选择解压后**直接包含 `manifest.json` 的目录**。
@@ -170,6 +170,18 @@
 6. 确认计划后开始移动，保持管理页打开，可切换到其他标签页。
 7. 查看“已提交到目标”和“已完整核对”两组进度；全部目标与来源归属检查通过后才完成。任务期间可以查看已读内容和帮助，范围与规则锁定。异常时按位置链接核对源、目标和中转；若用了中转夹，成功后留为空夹，可自行删除。
 
+### 收藏夹命名
+
+在“整理规则 → 收藏夹命名”选择“按顺序继承来源名称”。顺序以左侧所选来源的列表为准，预览和最终确认列出实际新名及旧夹改名。
+
+| 新夹数量 | 新收藏夹 | 原来源收藏夹 |
+| --- | --- | --- |
+| 与来源相同 | 按顺序继承原名 | 原名后追加“旧” |
+| 少于来源 | 前 N 个按顺序继承 | 所有来源名称保持不变 |
+| 多于来源 | 前 N 个继承，多出的用配置名称与序号 | 对应来源追加“旧” |
+
+“旧”名称冲突时加编号，超长时缩短前缀，完整结果会提前显示。新夹较少时允许新旧夹同名，以不同收藏夹 ID 区分。改名保留旧夹的可见性、简介和封面；新夹使用当前配置的可见性。确认前没有写入。若改名中途失败或响应不明确，停止并显示已确认和待核对的改名，不自动重试或撤销。原有“使用配置的基础名称”仍为默认模式。
+
 ## ⚡ 性能参考
 
 以下为 **6000 条视频的确定性模拟**，所有场景都核对完整顺序。执行请求包含执行前来源全量核对、移动和结果校验，不包含首次预览扫描。
@@ -184,9 +196,11 @@
 > [!NOTE]
 > 这是模拟接口支持批量时的**请求量比较**，不是 B 站真实耗时或吞吐承诺。网络、接口限制、校正和降级都会影响实际速度；不支持批量时仍可能耗时较长。
 
-最新自查覆盖 108 项回归检查，其中包含 2,000 组重复 / 失效 / 排序 / 批量异常组合，后续 `npm test` 会持续运行这些检查。详见 [整理可靠性自查](docs/reliability-audit.md)。
+最新自查覆盖 147 项回归检查，其中包含 2,000 组重复 / 失效 / 排序 / 批量异常组合，后续 `npm test` 会持续运行这些检查。详见 [整理可靠性自查](docs/reliability-audit.md)。
 
 使用 `npm run benchmark` 可复现。详见 [性能分析](./docs/extension-performance.md) 和 [模拟数据](./docs/transfer-benchmark.json)。
+
+v1.4.0 修复一次临时异常导致后续目标始终逐条移动的问题：经过完整核对后，有限度地从两条重新探测批量；明确的接口批量上限仍保留。目标只有一部分乱序时，已完整核对的正确后缀不再全部搬回重建。同组 6000 条模拟的一次部分成功场景，从 6007 次移动请求降至 117 次。`npm run benchmark:recovery` 可复现当前故障场景；[恢复基准](docs/recovery-benchmark.json) 同时保存旧版对照。模拟请求量不代表真实 B 站耗时。
 
 <a name="faq"></a>
 
@@ -195,7 +209,7 @@
 <details>
 <summary>取消之后，会修改收藏夹或刷新页面吗？</summary>
 
-取消执行前的确认不会创建收藏夹、移动视频或刷新页面，会保留当前预览。来源数据在同账号当前管理页内持续保留；读取规模增加或预览放置较久，都不会因为固定时限而作废。移除再选回、修改规则都能复用，新增来源只读缺失数据。点击“确认移动”后会重新读取全部来源，比对 ID、失效状态与排序信息；若有变化，在创建或移动前停止，并要求重新读取。重新读取、账号变化或开始执行会清除旧缓存；任务前顺序样本仅供查看，明确标注非实时。
+取消执行前的确认不会改名、创建收藏夹、移动视频或刷新页面，会保留当前预览。来源数据在同账号当前管理页内持续保留；读取规模增加或预览放置较久，都不会因为固定时限而作废。移除再选回、修改规则都能复用，新增来源只读缺失数据。点击“确认移动”后会重新读取全部来源，比对 ID、失效状态与排序信息；若有变化，在创建或移动前停止，并要求重新读取。重新读取、账号变化或开始执行会清除旧缓存；任务前顺序样本仅供查看，明确标注非实时。
 
 执行前的来源核对同样遵守 1.2 秒串行间隔；数据越多核对越久，界面显示逐页进度。读取和执行期间请保持管理页打开，并避免在其他客户端修改这些来源。
 
@@ -265,9 +279,9 @@ npm run benchmark
 npm run pack
 ```
 
-打包产物位于 `dist/bilibili-favorites-organizer-1.3.4.zip`，同时保存到 [`packages/`](packages/README.md)，附带 SHA-256。每次成品包随源码一起更新到 GitHub。
+打包产物位于 `dist/bilibili-favorites-organizer-1.4.0.zip`，同时保存到 [`packages/`](packages/README.md)，附带 SHA-256。每次成品包随源码一起更新到 GitHub。
 
-[下载最新成品包 v1.3.4](packages/bilibili-favorites-organizer-1.3.4.zip)
+[下载最新成品包 v1.4.0](packages/bilibili-favorites-organizer-1.4.0.zip)
 
 项目已安装 [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 到 `.agents/skills/ui-ux-pro-max/`，用于后续界面与交互工作；技能不进入扩展成品包。
 另已安装 Superpowers、Matt Pocock Skills、Karpathy Guidelines 和 Taste Skill，共新增 44 个正式开发技能。来源、版本、使用方式及校验说明见 [已安装技能](docs/installed-skills.md)。

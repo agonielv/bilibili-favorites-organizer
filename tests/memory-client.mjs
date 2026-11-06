@@ -13,6 +13,18 @@ export class MemoryClient {
     this.requests++; this.events.push({ type:'create',title,privacy });
     const folder = { id:String(this.nextId++),title,privacy,items:[] }; this.data.set(folder.id,folder); return {id:folder.id,title};
   }
+  async folderInfo(folder) {
+    this.requests++; const value = this.data.get(String(folder.id));
+    if (!value) throw Error('missing folder');
+    this.events.push({ type: 'info', id: value.id });
+    return { id: value.id, title: value.title, intro: value.intro || '', cover: value.cover || '', privacy: value.privacy === 'public' ? '0' : '1' };
+  }
+  async rename(folder, title, metadata) {
+    this.requests++; this.events.push({ type: 'rename', id: folder.id, from: metadata.title, to: title });
+    const value = this.data.get(String(folder.id));
+    if (!value) throw Error('missing folder');
+    Object.assign(value, { title, intro: metadata.intro, cover: metadata.cover, privacy: metadata.privacy === '1' ? 'private' : 'public' });
+  }
   async resources(folder) {
     const f=this.data.get(folder.id); if(!f)throw Error('missing folder');
     this.requests+=Math.max(1,Math.ceil(f.items.length/(this.options.pageSize??100))); this.events.push({type:'read',id:f.id});

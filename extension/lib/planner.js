@@ -1,9 +1,10 @@
-export const DEFAULT_RULES = Object.freeze({ group: true, groupOrder: 'count-desc', keep: true, time: 'desc', capacity: 1000, base: 'UP聚合', privacy: 'private' });
+import { planFolderNames } from './naming.js';
+export const DEFAULT_RULES = Object.freeze({ group: true, groupOrder: 'count-desc', keep: true, time: 'desc', capacity: 1000, base: 'UP聚合', privacy: 'private', naming: 'custom' });
 const collator = new Intl.Collator('zh-Hans-CN', { numeric: true });
 export function validateRules(input) {
   const rules = { ...DEFAULT_RULES, ...input };
   if (!Number.isInteger(rules.capacity) || rules.capacity < 1 || rules.capacity > 1000) throw new Error('容量请填写 1–1000 的整数。');
-  if (!['count-desc', 'count-asc', 'name'].includes(rules.groupOrder) || !['asc', 'desc'].includes(rules.time) || !['private', 'public'].includes(rules.privacy)) throw new Error('整理规则无效，请恢复默认后重试。');
+  if (!['count-desc', 'count-asc', 'name'].includes(rules.groupOrder) || !['asc', 'desc'].includes(rules.time) || !['private', 'public'].includes(rules.privacy) || !['custom', 'inherit'].includes(rules.naming)) throw new Error('整理规则无效，请恢复默认后重试。');
   if (typeof rules.group !== 'boolean' || typeof rules.keep !== 'boolean') throw new Error('分组规则无效。');
   rules.base = String(rules.base).trim() || DEFAULT_RULES.base;
   if (Array.from(rules.base).length > 10 || /[\u0000-\u001f]/.test(rules.base)) throw new Error('基础名称应为 1–10 个字符，不能包含控制字符。');
@@ -79,19 +80,10 @@ export function buildPlan(items, inputRules, sourceFolders = [], existingFolders
     }
   }
   if (current.length) chunks.push(current);
-  const names = new Set(existingFolders.map(folder => String(folder.title).trim().toLowerCase()));
-  let renamedTargets = 0;
-  const targets = chunks.map((items, index) => {
-    const requested = rules.base + (chunks.length > 1 ? `-${index + 1}` : '');
-    let name = requested, suffix = 2;
-    while (names.has(name.toLowerCase())) name = `${requested}-${suffix++}`;
-    if (name !== requested) renamedTargets++;
-    names.add(name.toLowerCase());
-    return { name, items };
-  });
+  const naming = planFolderNames(chunks, [...sources.values()], existingFolders, rules);
   return { rules, sources: [...sources.values()], skippedItems, retainedItems, recordCount: items.length + skippedItems.length,
     itemCount: uniqueItems.length, uploaderCount: grouped.size, missingDates: uniqueItems.filter(i => !i.publishedAt).length,
-    renamedTargets, chunks: targets };
+    ...naming };
 }
 // Never merge nonadjacent source segments just to obtain a larger batch.
 export function moveOperations(items, maxBatch = 1) {

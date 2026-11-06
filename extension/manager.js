@@ -105,13 +105,13 @@ function clearFieldErrors() {
 function ruleSummary(rules) {
   return [rules.group ? ({ 'count-desc': 'UP 视频数量多到少', 'count-asc': 'UP 视频数量少到多', name: 'UP 名称 A–Z' }[rules.groupOrder]) : '不按 UP 主聚合',
     rules.group && rules.keep ? '同 UP 不拆分' : '允许按容量拆分', rules.time === 'desc' ? '发布时间降序' : '发布时间升序',
-    `每夹 ${format(rules.capacity)} 条`, rules.privacy === 'private' ? '私密' : '公开'].join(' · ');
+    `每夹 ${format(rules.capacity)} 条`, rules.privacy === 'private' ? '私密' : '公开', rules.naming === 'inherit' ? '顺序继承来源名称' : '使用基础名称'].join(' · ');
 }
 function readRules(showErrors = false) {
   try {
     return validateRules({ group: $('group-enabled').checked, groupOrder: $('group-order').value, keep: keepPreference,
       time: document.querySelector('[name=time-order]:checked').value, privacy: $('privacy').value,
-      base: $('base-name').value, capacity: Number($('capacity').value) });
+      base: $('base-name').value, capacity: Number($('capacity').value), naming: $('naming-mode').value });
   } catch (error) {
     if (showErrors) {
       const id = error.message.startsWith('容量') ? 'capacity' : error.message.startsWith('基础名称') ? 'base-name' : null;
@@ -133,11 +133,15 @@ function syncRules() {
   $('keep-hint').textContent = grouped ? '容量不足时整体放入下一夹' : '未聚合时按时间与容量拆分';
   $('privacy-summary').textContent = $('privacy').value === 'private' ? '私密' : '公开';
   $('privacy-hint').textContent = $('privacy').value === 'private' ? '仅自己可见' : '其他用户可见';
+  const inherit = $('naming-mode').value === 'inherit';
+  $('base-label').textContent = inherit ? '额外目标基础名称' : '目标基础名称';
+  $('naming-hint').textContent = inherit ? '按左侧已选来源顺序继承。新夹较少时旧名不变；其余旧夹加“旧”。多出的新夹使用基础名称。' : '按基础名称和序号命名；旧收藏夹名称不变。';
   try { $('rule-summary').textContent = ruleSummary(readRules()); } catch { $('rule-summary').textContent = '请检查输入的规则。'; }
 }
 function applyRules(value) {
   const rules = validateRules(value);
   $('group-enabled').checked = rules.group; $('group-order').value = rules.groupOrder; keepPreference = rules.keep;
+  $('naming-mode').value = rules.naming;
   document.querySelector(`[name=time-order][value=${rules.time}]`).checked = true;
   $('privacy').value = rules.privacy; $('base-name').value = rules.base; $('capacity').value = rules.capacity; syncRules();
 }
@@ -369,7 +373,7 @@ async function generate(force = false) {
     for (const folder of folders.filter(folder => selected.has(folder.id))) folder.count = counts.get(folder.id) || 0;
     lastTask = null; taskReadback = null; metadataStale = false; await saveRules(); renderPlan();
     $('execution-panel').hidden = true; $('preview-content').hidden = false;
-    setStage('preview'); status(collected.loaded ? '只读预览已生成。尚未创建收藏夹或移动视频。' : '已复用本次读取数据，没有重新扫描。');
+    setStage('preview'); status(collected.loaded ? '只读预览已生成。尚未改名、创建收藏夹或移动视频。' : '已复用本次读取数据，没有重新扫描。');
     if (readPhase === 'preview') { readState = 'done'; renderReadProgress(); }
     if (plan.renamedTargets) status($('status').textContent + ` ${plan.renamedTargets} 个目标与已有收藏夹重名，已自动添加编号；请以预览中的名称为准。`);
     if (plan.skippedItems.length) status($('status').textContent + ` ${format(plan.skippedItems.length)} 条失效收藏已跳过，将保留在原收藏夹，不会删除。${plan.itemCount ? '' : '没有可移动的视频。'}`);
@@ -378,6 +382,9 @@ async function generate(force = false) {
 }
 function renderPlan() {
   $('video-total').textContent = format(plan.itemCount); $('uploader-total').textContent = format(plan.uploaderCount); $('target-total').textContent = plan.chunks.length;
+  $('naming-plan').hidden = plan.rules.naming !== 'inherit';
+  $('naming-plan-summary').textContent = namingSummary(plan);
+  fillRenameList($('source-rename-list'), plan);
   $('duplicate-note').hidden = !plan.retainedItems.length;
   $('duplicate-note').textContent = duplicateSummary(plan);
   $('sample-time').textContent = `最早来源读取于 ${time(snapshot.at)} · 本次预览生成于 ${time(snapshot.completedAt)}。预览不按时长过期；执行前重新核对来源内容。`;
@@ -390,6 +397,17 @@ function renderPlan() {
     if (count) $('unavailable-sources').append(node('li', `${source.title}：${format(count)} 条失效收藏，保留在原夹。`));
   }
   $('plan').replaceChildren(); shown = 0; renderMore();
+}
+function namingSummary(value) {
+  if (value.rules.naming !== 'inherit') return '';
+  const inherited = value.chunks.filter(chunk => chunk.inheritedFrom).length, extra = value.chunks.length - inherited;
+  return `${inherited} 个新收藏夹按左侧来源顺序继承名称${extra ? `，额外 ${extra} 个使用配置的基础名称` : ''}。${value.sourceRenames.length ? `${value.sourceRenames.length} 个旧收藏夹将追加“旧”，具体名称见下方。` : '旧收藏夹名称保持不变，新旧夹可能同名，仍分别保留。'}`;
+}
+function fillRenameList(container, value) {
+  container.replaceChildren();
+  for (const rename of value.sourceRenames) {
+    const row = node('li'); row.append(node('span', rename.from), node('span', '→ ' + rename.to)); container.append(row);
+  }
 }
 function duplicateSummary(value) {
   return value.retainedItems.length ? `重复视频按左侧列表顺序只移动第一份有效副本；其余 ${format(value.retainedItems.length)} 条重复收藏记录保留在各自源收藏夹。` : '';
@@ -406,22 +424,31 @@ function renderMore() {
       const row = node('div', undefined, 'video-row'); row.dataset.publishedAt = item.publishedAt;
       row.append(node('span', item.title), node('time', item.publishedAt ? new Date(item.publishedAt * 1000).toLocaleDateString('zh-CN') : '发布时间未知')); details.append(row);
     }
-    card.append(top, track, node('p', [...ups].map(([name, n]) => `${name} ${n}条`).join(' · '), 'uploader-list'), details); $('plan').append(card);
+    card.append(top, track);
+    if (chunk.inheritedFrom) card.append(node('p', '名称继承自：' + plan.sources.find(source => source.id === chunk.inheritedFrom).title, 'inherit-source'));
+    card.append(node('p', [...ups].map(([name, n]) => `${name} ${n}条`).join(' · '), 'uploader-list'), details); $('plan').append(card);
   }
   shown = end; $('load-more').hidden = shown === plan.chunks.length; $('load-more').textContent = `显示更多分组（${shown}/${plan.chunks.length}）`;
 }
-function cancel() { $('confirm').close(); status('已取消，预览已保留。没有创建收藏夹、移动视频或刷新页面。'); }
+function cancel() { $('confirm').close(); status('已取消，预览已保留。没有改名、创建收藏夹、移动视频或刷新页面。'); }
 function review() {
   if (!fresh() || !plan?.itemCount) throw new Error('预览已失效或没有可移动的视频，请检查来源并重新生成预览。');
   const r = plan.rules; fillSourceList($('confirm-sources'), snapshot);
   $('confirm-title').textContent = `确认移动 ${format(plan.itemCount)} 条？`;
   $('confirm-summary').textContent = `${selected.size} 个来源 · ${format(plan.itemCount)} 条可移动视频 → ${plan.chunks.length} 个${r.privacy === 'private' ? '私密' : '公开'}收藏夹。${plan.skippedItems.length ? `另有 ${format(plan.skippedItems.length)} 条失效收藏保留在原夹，不会删除。` : ''}执行前将重新读取并核对来源，期间不会创建或移动。`;
   $('confirm-summary').textContent += duplicateSummary(plan);
+  $('confirm-naming').hidden = plan.rules.naming !== 'inherit';
+  $('confirm-naming-summary').textContent = namingSummary(plan);
+  fillRenameList($('confirm-renames'), plan);
+  $('confirm-target-names').replaceChildren(...(plan.rules.naming === 'inherit' ? plan.chunks : []).map((chunk, index) => {
+    const row = node('li'); row.append(node('span', `${index + 1}. ${chunk.name}`), node('span', chunk.inheritedFrom ? '继承来源名称' : '配置名称')); return row;
+  }));
+  $('confirm-old-names').hidden = !plan.sourceRenames.length;
   $('confirm-rules').textContent = `${ruleSummary(r)}。目标：${plan.chunks.map(chunk => chunk.name).slice(0, 4).join('、')}${plan.chunks.length > 4 ? ' 等' : ''}。`;
-  $('execute').textContent = `确认移动 ${format(plan.itemCount)} 条`; showDialog('confirm');
+  $('execute').textContent = `确认${plan.sourceRenames.length ? '改名并' : ''}移动 ${format(plan.itemCount)} 条`; showDialog('confirm');
 }
 function renderLocations(state, sources) {
-  const locations = [...sources.map(folder => ({ ...folder, kind: '来源' })), ...(state.created || []).map(folder => ({ ...folder, kind: '目标' })), ...(state.buffer ? [{ ...state.buffer, kind: '私密中转夹' }] : [])];
+  const locations = [...sources.map(folder => ({ ...folder, title: state.sourceRenamed?.find(rename => rename.id === folder.id)?.to || folder.title, kind: '来源' })), ...(state.created || []).map(folder => ({ ...folder, kind: '目标' })), ...(state.buffer ? [{ ...state.buffer, kind: '私密中转夹' }] : [])];
   $('location-links').replaceChildren();
   for (const folder of locations) {
     const link = node('a', `${folder.kind}：${folder.title}`); link.href = `https://space.bilibili.com/${taskUid}/favlist?fid=${encodeURIComponent(folder.id)}&ftype=create`;
@@ -470,7 +497,7 @@ function executionProgress(state) {
 }
 function updateExecutionMeta() {
   if (!lastTask || !taskStarted) return;
-  $('execution-meta').textContent = `已用时 ${formatDuration((Date.now() - taskStarted) / 1000)} · 移动请求 ${lastTask.moveRequests || 0} 次`;
+  $('execution-meta').textContent = `已用时 ${formatDuration((Date.now() - taskStarted) / 1000)} · 移动请求 ${lastTask.moveRequests || 0} 次${lastTask.sourceRenamed?.length ? ` · 旧夹已改名 ${lastTask.sourceRenamed.length} 个` : ''}`;
 }
 async function execute() {
   if (!fresh() || !plan?.itemCount) { $('confirm').close(); throw new Error('预览已失效或没有可移动的视频，请重新生成。'); }
@@ -479,7 +506,7 @@ async function execute() {
   $('confirm').close(); taskStarted = Date.now(); verifiedTargets = new Map(); announcedPhase = ''; $('pending-message').hidden = true;
   $('execution-state').textContent = '进行中'; $('execution-message').className = 'task-explanation';
   executionProgress({ phase: '准备执行', confirmed: 0, verified: 0, total: approved.itemCount, moveRequests: 0, detail: '正在核对登录状态与执行计划…' });
-  $('task-scope-summary').textContent = `${sources.length} 个来源 · ${format(approved.itemCount)} 条 → ${approved.chunks.length} 个目标。${duplicateSummary(approved)}`;
+  $('task-scope-summary').textContent = `${sources.length} 个来源 · ${format(approved.itemCount)} 条 → ${approved.chunks.length} 个目标。${duplicateSummary(approved)}${namingSummary(approved)}`;
   $('task-rule-summary').textContent = ruleSummary(approved.rules); setStage('preview', false);
   try {
     await task(async session => {

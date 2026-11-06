@@ -68,6 +68,24 @@ export class BiliClient {
     for (const folder of folders) items.push(...await this.resources(folder, onPage));
     return items;
   }
+  async folderInfo(folder) {
+    const data = await this.request('folder/info', { params: { media_id: String(folder.id) } });
+    const info = data?.info || data;
+    const attrPrivacy = Number.isInteger(info?.attr) && info.attr >= 0 ? String(info.attr & 1) : null;
+    const privacy = ['0','1'].includes(String(info?.privacy)) ? String(info.privacy) : attrPrivacy;
+    if (String(info?.id) !== String(folder.id) || typeof info?.title !== 'string' || !info.title.trim() ||
+      typeof info.intro !== 'string' || typeof info.cover !== 'string' || privacy === null || (attrPrivacy !== null && privacy !== attrPrivacy)) {
+      throw new Error(`收藏夹“${folder.title || folder.id}”的名称或设置返回不完整，无法安全改名。`);
+    }
+    return { id: String(info.id), title: info.title, intro: info.intro, cover: info.cover, privacy };
+  }
+  rename(folder, title, metadata) {
+    if (String(metadata?.id) !== String(folder.id) || metadata?.title !== folder.title ||
+      typeof metadata.intro !== 'string' || typeof metadata.cover !== 'string' || !['0','1'].includes(metadata.privacy)) throw new Error('收藏夹改名设置不完整，已停止。');
+    if (!String(title).trim() || Array.from(title).length > 20 || /[\u0000-\u001f]/.test(title)) throw new Error('收藏夹名称应为 1–20 个字符，不能包含控制字符。');
+    return this.request('folder/edit', { form: { media_id: String(folder.id), title, intro: metadata.intro,
+      cover: metadata.cover, privacy: metadata.privacy, platform: 'web' } });
+  }
   async create(title, privacy) {
     const base = { title, privacy: privacy === 'private' ? '1' : '0' };
     const payloads = [base, { ...base, csrf_token: '', platform: 'web', jsonp: 'jsonp' }, { ...base, intro: '', cover: '' }];

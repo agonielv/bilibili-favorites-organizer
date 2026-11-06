@@ -69,6 +69,21 @@ export class TransferEngine {
     const actual = new Set(keys(await this.read({ id: sourceId, title: '来源核对' })));
     if (items.some(item => !actual.has(resourceKey(item)))) throw new Error('部分视频不在预期来源中，已停止以避免重复移动。');
   }
+  async abandonStagingProbe(sourceId, destination, items, actual, source) {
+    const probe = new Set(keys(items)), present = new Set(keys(actual));
+    if (present.size !== actual.length || actual.some(item => !probe.has(resourceKey(item))) ||
+        items.some(item => present.has(resourceKey(item)) === source.has(resourceKey(item)))) {
+      throw new Error('批量探测后的归属不明确，已停止；不会盲目重放。');
+    }
+    this.state.pending = 0;
+    this.orderBulk = false; this.looseIndex = 0;
+    // Undo only the IDs observed in the previously empty private buffer, then
+    // prove both the empty buffer and restored source before abandoning staging.
+    for (const item of actual) await this.send(destination.id, { id: sourceId }, [item]);
+    if ((await this.read(destination)).length) throw new Error('批量探测回退未完成，请核对中转夹。');
+    await this.sourceContains(sourceId, items);
+    throw new UnsupportedBatch('批量探测未完整移动，已核对后暂时改用逐条移动。');
+  }
   // Unordered transfers are only used inside this task's private buffer.
   // Explicit batch rejections may be partial: observe both locations before splitting.
   async looseOperation(sourceId, destination, items, allowed, attempt) {
@@ -83,14 +98,11 @@ export class TransferEngine {
       const source = new Set(keys(await this.read({ id: sourceId, title: '来源核对' })));
       if (items.some(item => present.has(resourceKey(item)) === source.has(resourceKey(item)))) throw new Error('批量请求后的归属不明确，已停止；不会盲目重放。');
       this.state.pending = 0;
-      if (attempt?.canAbort && attempt.count === 1 && actual.every(item => items.some(candidate => resourceKey(candidate) === resourceKey(item)))) {
+      if (attempt?.canAbort && attempt.count === 1 && items.length === BATCH_SIZES[0]) {
         // The very first two-item staging probe was rejected. Return only IDs observed
         // in the new buffer, verify their source, then avoid staging the entire job.
-        this.membershipCap = 1; this.orderBulk = false;
-        for (const item of actual) await this.send(destination.id, { id: sourceId }, [item]);
-        if ((await this.read(destination)).length) throw new Error('批量探测回退未完成，请核对中转夹。');
-        await this.sourceContains(sourceId, items);
-        throw new UnsupportedBatch('当前接口不支持批量，已核对后改用逐条移动。');
+        this.membershipCap = 1;
+        await this.abandonStagingProbe(sourceId, destination, items, actual, source);
       }
       this.membershipCap = Math.min(this.membershipCap, Math.max(1, Math.floor(items.length / 2)));
       if (this.membershipCap === 1) this.orderBulk = false;
@@ -108,17 +120,27 @@ export class TransferEngine {
     const allowed = new Set(keys(expected));
     if (allowed.size !== expected.length) throw new Error('中转计划出现重复视频，已停止。');
     const attempt = { count: 0, canAbort: canAbort && base.length === 0 };
-    let transferred = 0;
+    // A partial success does not prove an API batch limit. Keep its conservative
+    // single-item fallback local to this transfer; only explicit rejections may
+    // lower membershipCap for the entire task.
+    let transferred = 0, transferCap = 100;
     for (const op of operations) {
       for (let start = 0; start < op.items.length;) {
-        const size = Math.min(this.membershipCap, BATCH_SIZES[this.looseIndex], op.items.length - start);
+        const size = Math.min(this.membershipCap, transferCap, BATCH_SIZES[this.looseIndex], op.items.length - start);
         await this.looseOperation(op.sourceId, destination, op.items.slice(start, start + size), allowed, attempt);
         transferred += size;
         this.notify('批量转移', `${destination.title} · 已提交 ${transferred}/${expected.length - base.length} 条，随后核对实际归属。`);
         if (size > 1) {
           const head = await this.head(destination);
           if (head.items.some(item => !allowed.has(resourceKey(item)))) throw new Error('中转夹出现计划外内容，已停止。');
-          if (head.count !== base.length + transferred) { this.membershipCap = 1; this.orderBulk = false; }
+          if (head.count !== base.length + transferred) {
+            if (attempt.canAbort && attempt.count === 1) {
+              const actual = await this.read(destination);
+              const source = new Set(keys(await this.read({ id: op.sourceId, title: '来源核对' })));
+              await this.abandonStagingProbe(op.sourceId, destination, op.items.slice(start, start + size), actual, source);
+            }
+            transferCap = 1; this.orderBulk = false; this.looseIndex = 0;
+          }
           else if (this.looseIndex < BATCH_SIZES.length - 1) this.looseIndex++;
         }
         start += size;
@@ -134,7 +156,7 @@ export class TransferEngine {
       const missing = op.items.filter(item => !present.has(resourceKey(item)));
       if (!missing.length) continue;
       await this.sourceContains(op.sourceId, missing);
-      this.orderBulk = false; this.membershipCap = 1; repaired = true;
+      this.orderBulk = false; this.looseIndex = 0; repaired = true;
       for (const item of missing) await this.send(op.sourceId, destination, [item]);
     }
     if (repaired) actual = await this.read(destination);
@@ -154,20 +176,30 @@ export class TransferEngine {
     const actual = await this.read(target);
     const desiredSet = new Set(keys(desired));
     if (new Set(keys(actual)).size !== actual.length || actual.some(item => !desiredSet.has(resourceKey(item)))) throw new Error('目标中出现计划外视频或重复项，已停止；不会自动改动这些内容。');
+    // Single writes prepend records. A fully observed exact suffix can stay in
+    // place while only the incorrect/missing prefix is rebuilt. Bulk orientation
+    // trials retain their existing full-buffer reconciliation path.
+    let keep = 0;
+    if (mode === 'single') {
+      while (keep < actual.length && keep < desired.length && resourceKey(actual[actual.length - keep - 1]) === resourceKey(desired[desired.length - keep - 1])) keep++;
+    }
+    const retained = actual.slice(actual.length - keep);
+    const returning = actual.slice(0, actual.length - keep);
+    const prefix = desired.slice(0, desired.length - keep);
     const buffer = await this.ensureBuffer();
     const held = await this.read(buffer);
     const chunkSet = new Set(keys(chunkItems));
     const existing = new Set(keys(held));
     if (held.some(item => !chunkSet.has(resourceKey(item))) || actual.some(item => existing.has(resourceKey(item)))) throw new Error('中转与目标归属冲突，已停止。');
     // Return only this task's known target records. No delete/copy/reorder endpoint is used.
-    if (actual.length) await this.looseTransfer([{ sourceId: target.id, items: actual }], buffer, held);
+    if (returning.length) await this.looseTransfer([{ sourceId: target.id, items: returning }], buffer, held);
     const buffered = await this.read(buffer);
     const bufferedSet = new Set(keys(buffered));
-    const missing = desired.filter(item => !bufferedSet.has(resourceKey(item)));
+    const missing = prefix.filter(item => !bufferedSet.has(resourceKey(item)));
     for (const op of groupsBySource(missing)) await this.sourceContains(op.sourceId, op.items);
     if (missing.length) await this.looseTransfer(groupsBySource(missing), buffer, buffered);
-    if ((await this.read(target)).length) throw new Error('目标视频未完全回到中转夹，已停止，避免重复移动。');
-    this.state.confirmed = completed;
+    if (!sameOrder(await this.read(target), retained)) throw new Error('目标待校正部分未完全回到中转夹或保留顺序发生变化，已停止，避免重复移动。');
+    this.state.confirmed = completed + retained.length;
     if (mode !== 'single' && this.membershipCap > 1 && this.orderBulk) {
       if (mode === 'flip') this.orientation = this.orientation === 'write' ? 'display' : 'write';
       const fromBuffer = desired.map(item => ({ ...item, sourceId: buffer.id }));
@@ -186,7 +218,7 @@ export class TransferEngine {
       return;
     }
     this.orderBulk = false;
-    for (const item of [...desired].reverse()) {
+    for (const item of [...prefix].reverse()) {
       await this.send(buffer.id, target, [item]);
       this.state.confirmed++;
       this.notify('精确校正顺序', `${target.title} · ${this.state.confirmed}/${this.state.total}`);
@@ -196,12 +228,39 @@ export class TransferEngine {
   async process(chunk, target) {
     const initial = await this.head(target);
     if (initial.count !== 0 || initial.items.length) throw new Error('新目标收藏夹已有内容，已停止；不会移动或覆盖计划外视频。');
+    let recoveryUsed = false, verifiedRepair = false;
+    const recoverBatching = detail => {
+      recoveryUsed = true;
+      this.orderBulk = true; this.sizeIndex = 0; this.orientation = 'write';
+      this.notify('重新探测批量', detail);
+    };
+    // An ordering anomaly applies to the repaired target, not necessarily every
+    // later destination. Probe once from two items only after the previous target
+    // was fully verified and this destination was observed empty. Explicit API
+    // limits remain learned globally, including a single-only membership cap.
+    if (!this.orderBulk && this.membershipCap > 1 && this.state.verified > 0) {
+      recoverBatching('上一目标已完整核对；在新空夹从两条开始重新核对批量顺序。');
+    }
     const completed = this.state.verified;
     let items = chunk.items;
-    if (this.orderBulk && this.membershipCap > 1 && shouldStage(items)) items = await this.collect(chunk);
+    if (this.orderBulk && this.membershipCap > 1 && shouldStage(items)) {
+      items = await this.collect(chunk);
+      // collect() returns only after exact buffer membership reconciliation. An
+      // inferred partial-success fallback can now use this target's one recovery
+      // probe; an explicit single-only API cap is never restored.
+      if (items.every(item => item.sourceId === this.buffer.id) && !this.orderBulk && this.membershipCap > 1 && !recoveryUsed) {
+        recoverBatching('中转夹的计划归属已完整核对；目标从两条开始重新探测批量顺序。');
+      }
+    }
     const writeOrder = [...items].reverse();
     let offset = 0, expected = [];
     while (offset < writeOrder.length) {
+      // A successful repair has read and verified the entire written prefix.
+      // Permit one two-item recovery per target, shared with the fresh-target
+      // probe above; an arbitrary backend cannot cause an endless repair loop.
+      if (verifiedRepair && !recoveryUsed && !this.orderBulk && this.membershipCap > 1) {
+        recoverBatching('当前已提交部分的顺序已完整核对；剩余视频从两条开始重新探测批量。');
+      }
       const size = this.orderBulk ? Math.min(BATCH_SIZES[this.sizeIndex], this.membershipCap) : 1;
       const sourceId = writeOrder[offset].sourceId;
       const batch = [];
@@ -213,6 +272,7 @@ export class TransferEngine {
         this.membershipCap = Math.min(this.membershipCap, Math.max(1, Math.floor(batch.length / 2)));
         if (this.membershipCap === 1) this.orderBulk = false;
         await this.repair(target, next, items, completed, 'keep');
+        verifiedRepair = true;
         expected = next;
         continue;
       }
@@ -225,6 +285,7 @@ export class TransferEngine {
           const payload = this.orientation === 'display' ? [...batch].reverse() : batch;
           const appearsInPayloadOrder = head.count === next.length && head.items.length >= batch.length && sameOrder(head.items.slice(0, batch.length), payload);
           await this.repair(target, next, items, completed, appearsInPayloadOrder ? 'flip' : 'single');
+          verifiedRepair = true;
         } else if (batch.length === size && this.sizeIndex < BATCH_SIZES.length - 1) this.sizeIndex++;
       }
       expected = next;

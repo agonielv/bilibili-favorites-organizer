@@ -13,7 +13,7 @@ export class ExecutionError extends Error {
 }
 export async function executePlan(client, plan, { onProgress = () => {}, assertFresh = async () => {} } = {}) {
   const state = { confirmed: 0, verified: 0, total: plan.itemCount, skipped: plan.skippedItems.length, retained: plan.retainedItems.length, created: [], buffer: null, pending: 0,
-    moveRequests: 0, batchRequests: 0, target: null, phase: '准备目标收藏夹' };
+    sourceRenamed: [], pendingRename: null, moveRequests: 0, batchRequests: 0, target: null, phase: '准备目标收藏夹' };
   try {
     await assertFresh();
     if (!plan.itemCount) throw new Error('没有可移动的视频；失效收藏已保留在原收藏夹。');
@@ -23,7 +23,18 @@ export async function executePlan(client, plan, { onProgress = () => {}, assertF
       if (!source) throw new Error('源收藏夹已不存在，请重新读取并核对计划。');
     }
     const names = new Set(folders.map(folder => folder.title.trim().toLowerCase()));
-    for (const chunk of plan.chunks) if (names.has(chunk.name.toLowerCase())) throw new Error(`目标“${chunk.name}”已存在。请修改基础名称，避免混入旧内容或改变已有收藏夹。`);
+    const inheritedIds = new Set();
+    for (const chunk of plan.chunks) {
+      if (chunk.inheritedFrom) {
+        const source = plan.sources.find(folder => folder.id === chunk.inheritedFrom), actual = folders.find(folder => folder.id === chunk.inheritedFrom);
+        if (!source || source.title !== chunk.name || actual?.title !== source.title) throw new Error('来源收藏夹名称已变化，请重新生成名称继承预览。');
+        inheritedIds.add(source.id);
+      } else if (names.has(chunk.name.toLowerCase())) throw new Error(`目标“${chunk.name}”已存在。请修改基础名称，避免混入旧内容或改变已有收藏夹。`);
+    }
+    for (const rename of plan.sourceRenames || []) {
+      if (!inheritedIds.has(rename.id) || !plan.sources.some(source => source.id === rename.id && source.title === rename.from)) throw new Error('来源改名计划无效，请重新生成预览。');
+      if (names.has(rename.to.trim().toLowerCase())) throw new Error(`旧收藏夹名称“${rename.to}”已被占用，请重新生成预览。`);
+    }
     // Preview/cache age cannot safely determine freshness during a long scan.
     // Re-read every source before creating anything, including skipped records,
     // so same-count replacements and changed availability are caught as well.
@@ -38,6 +49,26 @@ export async function executePlan(client, plan, { onProgress = () => {}, assertF
       if (actual.length !== source.items.length) throw new Error(`源收藏夹“${source.title}”数量已变化，请重新读取并核对计划。尚未创建或移动。`);
       if (!matchesSource(actual, source.items)) throw new Error(`源收藏夹“${source.title}”的内容或视频状态已变化，请重新读取源视频并核对计划。尚未创建或移动。`);
       onProgress({ ...state, reading: { ...reading, read: actual.length, step: 'complete' }, detail: `已核对来源 ${index + 1}/${plan.sources.length}：“${source.title}”。尚未创建或移动。` });
+    }
+    const metadata = new Map();
+    if (inheritedIds.size) state.phase = '核对名称与设置';
+    for (const id of inheritedIds) {
+      await assertFresh();
+      const source = plan.sources.find(folder => folder.id === id);
+      onProgress({ ...state, detail: `正在核对名称与设置 ${metadata.size + 1}/${inheritedIds.size}：“${source.title}”。尚未改名、创建或移动。` });
+      const info = await client.folderInfo(source);
+      if (info.title !== source.title) throw new Error('来源收藏夹名称已变化，请重新生成名称继承预览。');
+      metadata.set(id, info);
+    }
+    state.phase = '更新旧收藏夹名称';
+    for (const rename of plan.sourceRenames || []) {
+      await assertFresh(); state.pendingRename = { ...rename };
+      onProgress({ ...state, detail: `旧收藏夹“${rename.from}”将改名为“${rename.to}”。` });
+      await client.rename({ id: rename.id, title: rename.from }, rename.to, metadata.get(rename.id));
+      await assertFresh(); const actual = await client.folderInfo({ id: rename.id, title: rename.to }), previous = metadata.get(rename.id);
+      if (actual.title !== rename.to || ['privacy','intro','cover'].some(field => actual[field] !== previous[field])) throw new Error('旧收藏夹改名或设置核对未通过，请检查实际名称、可见性、简介及封面。');
+      state.sourceRenamed.push({ ...rename }); state.pendingRename = null; names.add(rename.to.trim().toLowerCase());
+      onProgress({ ...state, detail: `旧收藏夹已改名为“${rename.to}”，其他设置已保留。` });
     }
     state.phase = '准备目标收藏夹';
     const folderIds = new Set(folders.map(folder => folder.id));
@@ -56,6 +87,14 @@ export async function executePlan(client, plan, { onProgress = () => {}, assertF
     onProgress({ ...state, detail: '核对视频已移出指定来源，其他来源的重复副本和失效收藏仍保留。' });
     await assertFresh();
     const after = await client.folders();
+    for (const rename of state.sourceRenamed) {
+      const source = after.find(folder => folder.id === rename.id);
+      if (source && source.title !== rename.to) {
+        await assertFresh(); const actual = await client.folderInfo(source);
+        if (actual.title !== rename.to) throw new Error('旧收藏夹名称在整理期间发生变化，请核对实际名称。');
+        source.title = actual.title;
+      }
+    }
     const movedBySource = new Map(), retainedBySource = new Map();
     for (const chunk of plan.chunks) for (const item of chunk.items) {
       if (!movedBySource.has(item.sourceId)) movedBySource.set(item.sourceId, new Set());
@@ -86,7 +125,8 @@ export async function executePlan(client, plan, { onProgress = () => {}, assertF
     // The UI can update counts without issuing another list or video scan.
     return { ...state, folders: after };
   } catch (cause) {
-    const message = `${cause.message} 已提交 ${state.confirmed}/${state.total} 条、已核对 ${state.verified} 条。${state.pending ? `当前批次 ${state.pending} 条的实际状态需要核对。` : ''}本轮创建 ${state.created.length} 个目标。${state.buffer ? `请同时核对私密中转夹“${state.buffer.title}”（ID ${state.buffer.id}），不要删除其中尚有的视频。` : ''}已完成的移动不会自动撤销。`;
+    const renameStatus = state.sourceRenamed.length || state.pendingRename ? `本轮已核对改名 ${state.sourceRenamed.length} 个旧收藏夹。${state.pendingRename ? `当前改名“${state.pendingRename.from} → ${state.pendingRename.to}”（ID ${state.pendingRename.id}）的实际结果待核对，不会自动重试。` : ''}已完成的改名不会自动撤销。` : '';
+    const message = `${cause.message} 已提交 ${state.confirmed}/${state.total} 条、已核对 ${state.verified} 条。${state.pending ? `当前批次 ${state.pending} 条的实际状态需要核对。` : ''}本轮创建 ${state.created.length} 个目标。${renameStatus}${state.buffer ? `请同时核对私密中转夹“${state.buffer.title}”（ID ${state.buffer.id}），不要删除其中尚有的视频。` : ''}已完成的移动不会自动撤销。`;
     throw new ExecutionError(message, { ...state, created: [...state.created] }, cause);
   }
 }
