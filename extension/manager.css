@@ -117,3 +117,7 @@ dialog.confirm-card{width:600px;background:linear-gradient(135deg,#fffffff5,#f6e
 #execution-read-slot:empty{display:none}#execution-read-slot .read-progress{margin-top:20px;border-radius:20px;box-shadow:var(--inset);background:rgba(255,255,255,.25)}
 .is-reading-sources .progress-grid,.is-reading-sources #execution-message,.is-reading-sources #task-locations{display:none}
 @media(max-width:600px){.read-progress{padding:18px;border-radius:21px}.read-heading{gap:10px;margin-bottom:17px}.read-heading h2{font-size:16px}.read-number{font-size:30px}.read-label>span{display:block;margin-top:3px;font-size:11px}.read-detail{font-size:11px}.read-note{font-size:11px}}
+
+.read-label b{font-weight:inherit}
+
+.task-caption+.execution-meta{margin-top:8px}

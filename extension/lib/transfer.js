@@ -27,7 +27,18 @@ export class TransferEngine {
     this.buffer = null; this.looseIndex = 0;
   }
   notify(phase, detail) { this.state.phase = phase; this.onProgress({ ...this.state, detail }); }
-  async read(folder) { await this.assertFresh(); return this.client.resources(folder); }
+  async read(folder, { kind = 'positions', expected = null } = {}) {
+    await this.assertFresh();
+    const reading = { kind, source: { id: folder.id, title: folder.title }, expected, read: 0, step: 'start' };
+    const emit = (update, detail) => this.onProgress({ ...this.state, reading: { ...reading, ...update }, detail });
+    emit({}, `正在读取“${folder.title}”的所有分页。`);
+    const actual = await this.client.resources(folder, page => emit({ ...page, step: 'page' },
+      `读取“${folder.title}”第 ${page.page} 页：${page.read}/${page.expected} 条。`));
+    // Target verification completes only after the caller has compared every ID
+    // and position (and any repair has finished), not when the last page arrives.
+    if (kind !== 'targets') emit({ step: 'complete', read: actual.length }, `“${folder.title}”的所有分页已读取，继续核对。`);
+    return actual;
+  }
   async head(folder) {
     await this.assertFresh();
     if (this.client.inspect) return this.client.inspect(folder);
@@ -222,9 +233,11 @@ export class TransferEngine {
       this.notify('移动视频', `${target.title} · 本批 ${batch.length} 条 · 已提交 ${this.state.confirmed}/${this.state.total}`);
     }
     this.notify('核对完整展示顺序', `核对 ${target.title} 的所有分页，而不只检查前几条。`);
-    if (!sameOrder(await this.read(target), chunk.items)) await this.repair(target, items, items, completed);
+    if (!sameOrder(await this.read(target, { kind: 'targets', expected: chunk.items.length }), chunk.items)) await this.repair(target, items, items, completed);
     this.state.confirmed = completed + chunk.items.length;
     this.state.verified += chunk.items.length;
     if (this.buffer && (await this.read(this.buffer)).length) throw new Error('中转夹仍有未完成视频，已停止，请核对本次中转夹。');
+    this.onProgress({ ...this.state, reading: { kind: 'targets', source: target, read: chunk.items.length,
+      expected: chunk.items.length, step: 'complete' }, detail: `“${target.title}”的全部视频与展示顺序已核对。` });
   }
 }

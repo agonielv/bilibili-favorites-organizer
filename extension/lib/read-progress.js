@@ -12,9 +12,10 @@ export class ReadProgress {
     const current = this.sources.find(item => item.id === String(folder.id));
     if (!current) return;
     this.active = current;
+    if (step === 'start') { current.done = false; current.observed = false; current.page = 0; }
     current.read = Math.max(0, Number(read) || 0);
     if (Number.isInteger(page) && page >= 0) current.page = page;
-    if (Number.isInteger(expected) && expected >= 0) current.expected = expected;
+    if (expected === null || (Number.isInteger(expected) && expected >= 0)) current.expected = expected;
     if (step !== 'start') current.observed = true;
     if (step === 'complete') { current.done = true; current.expected = current.read; }
   }

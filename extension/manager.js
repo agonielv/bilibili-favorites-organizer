@@ -4,6 +4,7 @@ import { BiliClient } from './lib/client.js';
 import { SourceCache } from './lib/source-cache.js';
 import { attachFolderSelection } from './lib/folder-selection.js';
 import { ReadProgress } from './lib/read-progress.js';
+import { formatDuration } from './lib/duration.js';
 import { executePlan } from './lib/runner.js';
 import { storage, getSession, assertSession, exclusive, prepareTransport } from './lib/platform.js';
 
@@ -17,6 +18,7 @@ let snapshot = null, plan = null, taskReadback = null, stage = 'selection', busy
 let keepPreference = true, pages = 0, shown = 0, metadataStale = false, lastTask = null, taskStarted = 0, taskUid = null;
 let announcedPhase = '', lastAnnouncement = 0;
 let readTracker = null, readPhase = null, readState = 'running';
+let verifiedTargets = new Map();
 let folderSelection;
 let lastFolderAnnouncement = 0;
 const client = new BiliClient(queue, async () => {
@@ -37,7 +39,9 @@ function status(message) { $('status').textContent = message; }
 const READ_PHASES = {
   preview: { label: '生成整理预览', active: '正在读取来源', done: '来源读取完成', note: '只读取所选来源，尚未创建或移动视频。' },
   preflight: { label: '执行前核对', active: '正在核对来源内容', done: '来源内容已核对', note: '核对通过后才会开始创建和移动视频。' },
-  sources: { label: '执行后检查', active: '正在核对来源归属', done: '来源归属已核对', note: '目标已核对，正在检查原来源与保留副本。' }
+  sources: { label: '执行后检查', active: '正在核对来源归属', done: '来源归属已核对', note: '目标已核对，正在检查原来源与保留副本。' },
+  targets: { label: '目标顺序核对', active: '正在核对完整展示顺序', done: '目标展示顺序已核对', note: '正在逐页核对所有视频与展示顺序，通过后计入“已完整核对”。' },
+  positions: { label: '分页读取', active: '正在读取收藏内容', done: '收藏内容已读取', note: '正在读取所有分页，随后核对数量、归属和顺序。' }
 };
 function clearReadProgress() { $('read-progress').hidden = true; $('status').classList.remove('sr-only'); $('execution-panel').classList.remove('is-reading-sources'); readTracker = null; readPhase = null; }
 function beginReadProgress(phase, sources, cached = new Map()) {
@@ -57,6 +61,10 @@ function renderReadProgress() {
   $('read-title').textContent = readState === 'stopped' ? `${phase.label}已停止` : readState === 'done' ? phase.done : phase.active;
   $('read-state').textContent = readState === 'stopped' ? '已停止' : readState === 'done' ? '已完成' : '进行中';
   $('read-percent').textContent = view.percent;
+  const overallLabel = readPhase === 'targets' ? '目标整体核对进度' : readPhase === 'positions' ? '本次读取进度' : '来源整体进度';
+  $('read-overall-label').textContent = overallLabel;
+  $('read-overall').setAttribute('aria-label', overallLabel + '（按收藏夹）');
+  $('read-current').setAttribute('aria-label', readPhase === 'targets' ? '当前目标收藏夹核对进度' : '当前收藏夹读取进度');
   $('read-count').textContent = `已完成 ${view.completed} / ${view.total} 个收藏夹`;
   $('read-folder').textContent = current?.title || '等待来源';
   $('read-folder-count').textContent = current ? `${format(current.read)}${current.expected === null ? ' 条 · 总数待确认' : ` / ${format(current.expected)} 条`}` : '等待页数据';
@@ -67,7 +75,7 @@ function renderReadProgress() {
     if (value === null) bar.removeAttribute('aria-valuenow'); else bar.setAttribute('aria-valuenow', value);
     bar.setAttribute('aria-valuetext', label); bar.firstElementChild.style.transform = `scaleX(${(value ?? 0) / 100})`;
   }
-  $('read-page').textContent = current?.page ? `当前来源 · 已读取 ${current.page} 页` : readState === 'done' ? '所选来源已全部读取' : '正在准备来源数据';
+  $('read-page').textContent = current?.page ? `当前收藏夹 · 已读取 ${current.page} 页` : readState === 'done' ? '本阶段已全部读取' : '正在准备收藏夹数据';
   $('read-note').textContent = readState === 'stopped' ? '已保留停止时的读取进度，请查看下方错误说明。' : phase.note;
 }
 function stopReadProgress() {
@@ -425,8 +433,13 @@ function renderLocations(state, sources) {
 function executionProgress(state) {
   if (state.phase === '任务已停止') stopReadProgress();
   else if (state.reading) {
-    if (readPhase !== state.reading.kind || !readTracker) beginReadProgress(state.reading.kind, taskReadback.sources);
+    const reading = state.reading;
+    if (readPhase !== reading.kind || !readTracker || (reading.kind === 'positions' && reading.step === 'start')) {
+      const folders = reading.kind === 'targets' ? state.created : reading.kind === 'positions' ? [reading.source] : taskReadback.sources;
+      beginReadProgress(reading.kind, folders, reading.kind === 'targets' ? verifiedTargets : new Map());
+    }
     readTracker.update(state.reading); renderReadProgress();
+    if (reading.kind === 'targets' && reading.step === 'complete') verifiedTargets.set(String(reading.source.id), reading.read);
   } else if (state.phase === '完成' && readPhase === 'sources') { readState = 'done'; renderReadProgress(); }
   else if (readPhase && !['核对来源内容', '核对来源归属'].includes(state.phase)) clearReadProgress();
   lastTask = state;
@@ -442,7 +455,7 @@ function executionProgress(state) {
   $('execution-target').textContent = state.phase === '完成' ? '全部目标与来源归属已核对' : state.target ? `当前目标：${state.target}` : '正在准备本次整理';
   $('submitted-hint').textContent = state.phase === '完成' ? '全部目标已完成核对' : state.phase === '核对来源归属' ? '目标已提交，正在检查来源' : '仍需完整核对，可能校正';
   $('execution-message').textContent = state.detail;
-  $('execution-meta').textContent = `已用时 ${Math.floor((Date.now() - taskStarted) / 1000)} 秒 · 移动请求 ${state.moveRequests || 0} 次`;
+  updateExecutionMeta();
   const phase = state.phase === '完成' ? 'done' : state.phase === '核对来源归属' ? 'sources' : state.target ? 'transfer' : 'prepare';
   let previous = true;
   for (const step of $('task-steps').children) {
@@ -451,14 +464,19 @@ function executionProgress(state) {
   }
   const now = Date.now();
   if (announcedPhase !== state.phase || now - lastAnnouncement >= 2000) {
-    status(`${state.phase}：已提交 ${format(state.confirmed)} 条，已完整核对 ${format(state.verified)} 条。`); announcedPhase = state.phase; lastAnnouncement = now;
+    status(state.reading ? `${READ_PHASES[state.reading.kind].label}：“${state.reading.source.title}”，已读取 ${format(state.reading.read)}${Number.isInteger(state.reading.expected) ? ` / ${format(state.reading.expected)}` : ''} 条。` :
+      `${state.phase}：已提交 ${format(state.confirmed)} 条，已完整核对 ${format(state.verified)} 条。`); announcedPhase = state.phase; lastAnnouncement = now;
   }
+}
+function updateExecutionMeta() {
+  if (!lastTask || !taskStarted) return;
+  $('execution-meta').textContent = `已用时 ${formatDuration((Date.now() - taskStarted) / 1000)} · 移动请求 ${lastTask.moveRequests || 0} 次`;
 }
 async function execute() {
   if (!fresh() || !plan?.itemCount) { $('confirm').close(); throw new Error('预览已失效或没有可移动的视频，请重新生成。'); }
   const approved = plan, originalSnapshot = snapshot, sources = folders.filter(folder => selected.has(folder.id)).map(folder => ({ ...folder }));
   taskReadback = originalSnapshot; taskUid = originalSnapshot.uid;
-  $('confirm').close(); taskStarted = Date.now(); announcedPhase = ''; $('pending-message').hidden = true;
+  $('confirm').close(); taskStarted = Date.now(); verifiedTargets = new Map(); announcedPhase = ''; $('pending-message').hidden = true;
   $('execution-state').textContent = '进行中'; $('execution-message').className = 'task-explanation';
   executionProgress({ phase: '准备执行', confirmed: 0, verified: 0, total: approved.itemCount, moveRequests: 0, detail: '正在核对登录状态与执行计划…' });
   $('task-scope-summary').textContent = `${sources.length} 个来源 · ${format(approved.itemCount)} 条 → ${approved.chunks.length} 个目标。${duplicateSummary(approved)}`;
@@ -578,5 +596,8 @@ chrome.cookies.onChanged.addListener(({ cookie }) => {
   try { applyRules(await storage.get('rules') || DEFAULT_RULES); } catch { applyRules(DEFAULT_RULES); }
   await queue.cooldown(); renderFolders(); setStage('selection', false); updateCooldown();
   try { await getSession(); $('account-label').textContent = '已登录 · 点击连接'; } catch { $('account-label').textContent = '未登录 B 站'; }
-  setInterval(updateCooldown, 1000);
+  setInterval(() => {
+    updateCooldown();
+    if (busy && lastTask && !['完成', '任务已停止'].includes(lastTask.phase)) updateExecutionMeta();
+  }, 1000);
 })().catch(report);

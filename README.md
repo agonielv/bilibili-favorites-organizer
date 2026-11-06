@@ -1,6 +1,6 @@
 # Bilibili 收藏夹整理
 
-![Version](https://img.shields.io/badge/Version-1.3.3-0069D2)
+![Version](https://img.shields.io/badge/Version-1.3.4-0069D2)
 ![Chrome](https://img.shields.io/badge/Chrome-116%2B-4285F4)
 ![Edge](https://img.shields.io/badge/Edge-116%2B-0078D7)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-34A853)
@@ -52,7 +52,7 @@
 6. **记住设置**：在本机保存规则与账号对应的选择，支持恢复默认和清除设置。
 7. **毛玻璃工作区**：中性背景、前景磨砂玻璃、完整文字标签；目录 / 范围 / 规则三栏及常驻操作区，窄窗口用原生面板保留入口。
 8. **失效收藏不阻断整理**：读取时识别失效标记，预览列出数量及所在来源；仅整理其余视频，失效条目保留在原夹，不自动删除。失效条目不参与 UP 聚合或容量计算；全是失效内容时可查看预览，不能执行空任务。
-9. **直观读取进度**：预览读取、执行前核对与执行后来源检查使用统一毛玻璃双进度卡片，显示来源整体进度（按收藏夹）、当前收藏夹条数 / 百分比与页数。错误保留停止位置，缓存重算不显示虚假读取。
+9. **直观读取进度**：预览读取、执行前核对、目标全量分页核对、中转内容读取与执行后来源检查使用统一毛玻璃双进度卡片，显示来源整体进度（按收藏夹）、当前收藏夹条数 / 百分比与页数。错误保留停止位置，缓存重算不显示虚假读取。耗时每秒更新，达到分钟 / 小时后自动显示分秒 / 时分秒，结束后冻结。
 9. **可理解的任务反馈**：分开显示已提交与已完整核对；任务中仍可搜索、查看任务前样本和帮助。完成后同步目录数量；停止时显示已知视频位置、未知批次和冷却倒计时。
 
 ### 提速与请求保护
@@ -124,7 +124,7 @@
 
 ### 本地安装（当前方式）
 
-在 GitHub 当前分支点击 **Code → Download ZIP** 获取源码并解压。也可以在本机通过 `npm run pack` 生成 `bilibili-favorites-organizer-1.3.3.zip` 后解压安装。
+在 GitHub 当前分支点击 **Code → Download ZIP** 获取源码并解压。也可以在本机通过 `npm run pack` 生成 `bilibili-favorites-organizer-1.3.4.zip` 后解压安装。
 
 - 使用仓库源码：选择解压后的 **`extension/` 目录**。
 - 使用打包产物：选择解压后**直接包含 `manifest.json` 的目录**。
@@ -184,7 +184,7 @@
 > [!NOTE]
 > 这是模拟接口支持批量时的**请求量比较**，不是 B 站真实耗时或吞吐承诺。网络、接口限制、校正和降级都会影响实际速度；不支持批量时仍可能耗时较长。
 
-最新自查覆盖 103 项回归检查，其中包含 2,000 组重复 / 失效 / 排序 / 批量异常组合，后续 `npm test` 会持续运行这些检查。详见 [整理可靠性自查](docs/reliability-audit.md)。
+最新自查覆盖 108 项回归检查，其中包含 2,000 组重复 / 失效 / 排序 / 批量异常组合，后续 `npm test` 会持续运行这些检查。详见 [整理可靠性自查](docs/reliability-audit.md)。
 
 使用 `npm run benchmark` 可复现。详见 [性能分析](./docs/extension-performance.md) 和 [模拟数据](./docs/transfer-benchmark.json)。
 
@@ -265,9 +265,9 @@ npm run benchmark
 npm run pack
 ```
 
-打包产物位于 `dist/bilibili-favorites-organizer-1.3.3.zip`，同时保存到 [`packages/`](packages/README.md)，附带 SHA-256。每次成品包随源码一起更新到 GitHub。
+打包产物位于 `dist/bilibili-favorites-organizer-1.3.4.zip`，同时保存到 [`packages/`](packages/README.md)，附带 SHA-256。每次成品包随源码一起更新到 GitHub。
 
-[下载最新成品包 v1.3.3](packages/bilibili-favorites-organizer-1.3.3.zip)
+[下载最新成品包 v1.3.4](packages/bilibili-favorites-organizer-1.3.4.zip)
 
 项目已安装 [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 到 `.agents/skills/ui-ux-pro-max/`，用于后续界面与交互工作；技能不进入扩展成品包。
 
